@@ -9,7 +9,7 @@ An AI psychiatrist assistant for measuring depression symptoms from clinical int
 git clone https://github.com/trendscenter/ai-psychiatrist.git
 ```
 
-2. Navigate to the cloned directory and create a new conda environment using the provided `env_reqs.yml` file:
+2. Navigate to the cloned directory and create a new conda environment using the provided [`env_reqs.yml`](env_reqs.yml) file:
 ```bash
 cd ai-psychiatrist
 conda env create --name aipsy --file ./env_reqs.yml
@@ -19,6 +19,12 @@ conda env create --name aipsy --file ./env_reqs.yml
 ```bash
 conda activate aipsy
 ```
+
+4. Create a new git branch for your changes:
+```bash
+git checkout -b dev_<your_last_name>
+```
+Replace `<your_last_name>` with your last name.
 
 ## Ollama on TReNDS Cluster
 
