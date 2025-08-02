@@ -3,8 +3,8 @@
 #SBATCH -n 1
 #SBATCH -p qTRD
 #SBATCH -c 5
-#SBATCH --mem=100g
-#SBATCH -t 07:00:00
+#SBATCH --mem=50g
+#SBATCH -t 08:00:00
 #SBATCH -J aipsy
 #SBATCH -e ./err/err%A-%a.err
 #SBATCH -o ./out/out%A-%a.out
@@ -22,6 +22,6 @@ cd /data/users2/agreene46/ai-psychiatrist
 
 conda activate
 
-python quantitative_analysis.py
+python embedding_batch_script.py
 
 sleep 5s
