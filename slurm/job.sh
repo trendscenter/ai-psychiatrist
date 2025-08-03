@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH -J ollama
-#SBATCH -p qTRDGPU
+#SBATCH -p qTRDGPUH
 #SBATCH -A trends53c17
 #SBATCH -t 08:00:00
 #SBATCH -c 24
 #SBATCH --mem=100g
-#SBATCH --gres=gpu:A40:2
+#SBATCH --gres=gpu:V100:2
 #SBATCH -e err%A-%a.err
 #SBATCH -o out%A-%a.out
 

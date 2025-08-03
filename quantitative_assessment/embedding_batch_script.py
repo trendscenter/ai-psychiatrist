@@ -396,7 +396,7 @@ def main():
     # Get participants to process (starting from index 40)
     participants_to_process = unique_participants[40:]
     # Participants that didn't process
-    participants_to_process = [p for p in participants_to_process if p not in (376, 400)] 
+    participants_to_process = [319, 336, 356, 372, 376, 400, 404, 422, 441, 474]
 
     log_message(f"Total participants to process: {len(participants_to_process)}")
     
