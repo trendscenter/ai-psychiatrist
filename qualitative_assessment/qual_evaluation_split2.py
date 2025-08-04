@@ -3,6 +3,7 @@ import requests
 import time
 import json
 import re
+import os
 from requests.exceptions import Timeout, RequestException
 
 # only include failed IDs
@@ -19,8 +20,6 @@ results = []
 failed_evaluations = []
 processed_count = 0
 
-
-import os
 
 def parse_score_and_explanation(response_text):
     """Extract score and explanation from model response"""
