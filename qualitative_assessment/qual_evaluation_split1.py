@@ -3,6 +3,7 @@ import requests
 import time
 import json
 import re
+import os
 from requests.exceptions import Timeout, RequestException
 
 def parse_score_and_explanation(response_text):
@@ -46,7 +47,6 @@ failed_evaluations = []
 processed_count = 0
 
 
-import os
 if os.path.exists(output_csv_path):
     print(f"Found existing results file: {output_csv_path}")
     existing_results = pd.read_csv(output_csv_path)
