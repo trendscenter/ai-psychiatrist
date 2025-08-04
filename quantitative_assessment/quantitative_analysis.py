@@ -73,6 +73,28 @@ Key Principles:
 6. Follow the format specified exactly"""
 
 def run_phq8_analysis(patient_transcript, ground_truth):
+    """
+    Predicts PHQ8 values from a patients transcript, compares to ground truth, and calculates evaluation metrics
+
+    Parameters
+    ----------
+    patient_transcript : string
+        The patients transcript
+    ground_truth : pandas series
+        The ground truth PHQ8 values for a given participant
+
+    Returns
+    -------
+    tuple
+        A 5-tuple containing:
+        - phq8_scores (PHQ8ScoresWithExplanations or None): Parsed PHQ8 scores with evidence and reasoning
+        - avg_difference (float or None): Average absolute difference between predicted and ground truth scores
+        - accuracy_on_available (float or None): Accuracy score on questions that weren't marked N/A (0-1 scale)
+        - num_questions_NA (int or None): Number of questions marked as N/A out of 8 total
+        - overall_accuracy (float or None): Overall accuracy adjusted for N/A responses (0-1 scale)
+        
+        Returns (None, None, None, None, None) if parsing fails.
+    """
     quantitative_prompt = f"""Analyze the following interview transcript and predict PHQ-8 scores for each symptom domain.
 
 Interview transcript:

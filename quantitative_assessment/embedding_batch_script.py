@@ -12,6 +12,11 @@ from sklearn.metrics.pairwise import cosine_similarity
 import traceback
 import sys
 
+############################################################################################################################
+##################### Configuring ollama, paths, and pydantic model s######################################################
+############################################################################################################################
+
+
 # Ollama Config
 OLLAMA_NODE = "arctrdagn039"
 BASE_URL = f"http://{OLLAMA_NODE}:11434/api/chat"
@@ -40,7 +45,26 @@ class PHQ8ScoresWithExplanations(BaseModel):
     PHQ8_Concentrating: PHQ8ScoreWithExplanation # Trouble concentrating
     PHQ8_Moving: PHQ8ScoreWithExplanation      # Moving/speaking slowly or being fidgety/restless
 
+############################################################################################################################
+##################### Created 4 line chunks (with a 2 lines sliding window) for each reference transcript and embedded them 
+############################################################################################################################
+
 def get_embedding(text, model="dengcao/Qwen3-Embedding-8B:Q8_0"):
+    """
+    Creates embedding from given text input and model 
+
+    Parameters
+    ----------
+    text : string
+        The text to be embedded
+    model : string
+        The name of the ollama model to be used for embedding
+
+    Returns
+    -------
+    list
+        The vector embedding of the text
+    """
     BASE_URL = f"http://{OLLAMA_NODE}:11434/api/embeddings"
     
     response = requests.post(
@@ -57,6 +81,26 @@ def get_embedding(text, model="dengcao/Qwen3-Embedding-8B:Q8_0"):
         raise Exception(f"API call failed with status {response.status_code}: {response.text}")
 
 def create_sliding_chunks(transcript_text, chunk_size=4, step_size=2):
+    """
+    Splits the transcript into several chunks 
+
+    Parameters
+    ----------
+    transcript_text : string
+        The transcript
+    chunk_size : int
+        The amount of newlines per chunk
+    step_size : int
+        The newline distance moved each time a chunk is created
+            -Ex. transcript_text = "A\nB\nC\nD\nE\nF\nG\nH", chunk_size = 4, step_size = 2
+            -Chunk 1: "A\nB\nC\nD"
+            -Chunk 2: "C\nD\nE\nF"
+
+    Returns
+    -------
+    list
+        The text chunk strings
+    """
     lines = transcript_text.split('\n')
     
     # Remove empty lines at the end if any
@@ -83,7 +127,31 @@ def create_sliding_chunks(transcript_text, chunk_size=4, step_size=2):
     
     return chunks
 
+############################################################################################################################
+######### Runs cosine similarity to pull 3 most similar transcript chunks from the reference transcripts ##################
+############################################################################################################################
+
 def find_similar_chunks(evidence_text_embedding, participant_embedded_transcripts, top_k=3):
+    """
+    Runs cosine similarity between the evidence and all of the reference transcript embedded chunks.
+    Then, grabs the top_k most similar ones.
+
+    Parameters
+    ----------
+    evidence_text_embedding : list
+        The embedding of the pulled evidence from the current transcript for the given PHQ8 question
+    participant_embedded_transcripts : dict
+        The dictionary with participant IDs as keys and (raw_text, embedding) as values for each transcript chunk
+    top_k : int
+        The number of most similar chunks that should be pulled (ex. top_k=3 means pull the 3 most similar chunks)
+
+    Returns
+    -------
+    list
+        List of dictionaries containing the most similar chunks, each with keys:
+        'participant_id', 'raw_text', 'similarity', and 'embedding'.
+        Sorted by similarity score in descending order.
+    """
     similarities = []
     
     # Go through all participants and their embeddings
@@ -107,6 +175,23 @@ def find_similar_chunks(evidence_text_embedding, participant_embedded_transcript
     return similarities[:top_k]
 
 def log_message(message, print_to_console=True):
+    """
+    Logs a given message in the log file
+
+    Parameters
+    ----------
+    message : string
+        The message to be embedded in the log file
+
+    print_to_console : bool
+        Whether or not to print the given message to the console
+
+    Writes
+    -------
+    string
+        Writes the given message to the log file and prints to terminal if the bool is true
+    """
+
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_entry = f"[{timestamp}] {message}"
     
@@ -117,6 +202,14 @@ def log_message(message, print_to_console=True):
         print(message)
 
 def load_processed_participants():
+    """
+    Loads all participants ids from the jsonl file so as to skip them when processing
+
+    Returns
+    -------
+    set
+        All processed participant id ints
+    """
     processed_ids = set()
     
     if os.path.exists(JSONL_FILE):
@@ -134,6 +227,27 @@ def load_processed_participants():
     return processed_ids
 
 def save_participant_result(participant_id, phq8_scores):
+    """
+    Saves a given participants prediction output to the jsonl file
+
+    Parameters
+    ----------
+    participant_id : int
+        The id of the given participant
+
+    phq8_scores : PHQ8ScoresWithExplanations
+        Pydantic model containing PHQ-8 assessment results. Has 8 attributes 
+        (PHQ8_NoInterest, PHQ8_Depressed, PHQ8_Sleep, PHQ8_Tired, PHQ8_Appetite, 
+        PHQ8_Failure, PHQ8_Concentrating, PHQ8_Moving), each of type 
+        PHQ8ScoreWithExplanation with 'evidence', 'reason', and 'score' fields.
+    
+    Writes
+    -------
+    json
+        Record containing participant_id and timestamp. 
+        Also, predicted participants PHQ8 information for each question including:
+        "evidence", "reason", and "score"
+    """
     result = {
         "participant_id": participant_id,
         "timestamp": datetime.now().isoformat()
@@ -153,7 +267,31 @@ def save_participant_result(participant_id, phq8_scores):
     with open(JSONL_FILE, 'a') as f:
         f.write(json.dumps(result) + '\n')
 
+############################################################################################################################
+####### Extracting evidence from the transcript for each PHQ8 question using Gemma 3 27b ###################################
+############################################################################################################################
+
 def extract_evidence_for_participant(transcript, participant_id):
+    """
+    Has LLM grab evidence from the transcript based on the PHQ8 criteria.
+
+    Parameters
+    ----------
+    transcript : string
+        The participants transcript
+
+    participant_id : int
+        The id of the given participant
+    
+    Returns
+    -------
+    dict
+        A dictionary containing PHQ-8 domain keys mapped to lists of evidence quotes.
+        Each key corresponds to a PHQ-8 domain (e.g., 'PHQ8_NoInterest', 'PHQ8_Depressed')
+        and each value is a list of direct transcript quotes that provide evidence
+        for that domain. Empty lists indicate no evidence found for that domain.
+        Duplicate quotes are removed from each evidence list.
+    """
     evidence_extraction_prompt = f"""Analyze the following therapy transcript and extract specific text chunks that provide evidence for each PHQ-8 domain. Based on the evidence found, determine the appropriate PHQ-8 score for each domain.
 
 PHQ-8 scoring reference:
@@ -226,8 +364,32 @@ Important: Extract UNIQUE quotes only - do not repeat the same quote multiple ti
         log_message(f"Error extracting evidence for participant {participant_id}: {str(e)}", print_to_console=False)
         raise
 
+############################################################################################################################
+######## Grabbing similar chunks + their PHQ8 score from reference transcripts based on current transcript evidence.
+#############################################################################################################################
+
 def process_evidence_for_references(evidence_dict, participant_embedded_transcripts, phq8_ground_truths):
+    """
+    Grabs chunks from other transcripts that are similar to the evidence pulled for the current transcript.
+    Then, grabs those chunks ground truth scores and formats all that into a string for use in the prompt.
+
+    Parameters
+    ----------
+    evidence_dict : dict
+        Dictionary containing PHQ-8 domain keys mapped to lists of evidence quotes
     
+    participant_embedded_transcripts : dict
+        Dict of embedded chunks of the reference transcripts and their participant IDs
+    
+    phq8_ground_truths : pandas dataframe
+        Dataframe containing ground truth PHQ-8 scores for participants
+    
+    Returns
+    -------
+    str
+        A string with all the reference transcripts chunks and their corresponding PHQ8 scores
+    """
+
     evidence_keys = [
         'PHQ8_NoInterest', 'PHQ8_Depressed', 'PHQ8_Sleep', 'PHQ8_Tired',
         'PHQ8_Appetite', 'PHQ8_Failure', 'PHQ8_Concentrating', 'PHQ8_Moving'
@@ -292,7 +454,35 @@ def process_evidence_for_references(evidence_dict, participant_embedded_transcri
     
     return reference_evidence
 
+################################################################################################################################
+############ Running quantitative analysis, but with reference transcripts this time. Grabs evidence, reasons, and outputs score
+#################################################################################################################################
+
+
 def run_phq8_analysis_batch(patient_transcript, ground_truth, reference_evidence=""):
+    """
+    Grabs chunks from other transcripts that are similar to the evidence pulled for the current transcript.
+    Then, grabs those chunks ground truth scores and formats all that into a string for use in the prompt.
+
+    Parameters
+    ----------
+    patient_transcript : string
+        The patients transcript
+    
+    ground_truth : dict
+        Dict of embedded chunks of the reference transcripts and their participant IDs
+    
+    reference_evidence : string
+        A string containing the reference evidence chunks and their PHQ8 scores
+    
+    Returns
+    -------
+    PHQ8ScoresWithExplanations
+        Pydantic model containing PHQ-8 assessment results. Has 8 attributes 
+        (PHQ8_NoInterest, PHQ8_Depressed, PHQ8_Sleep, PHQ8_Tired, PHQ8_Appetite, 
+        PHQ8_Failure, PHQ8_Concentrating, PHQ8_Moving), each of type 
+        PHQ8ScoreWithExplanation with 'evidence', 'reason', and 'score' fields.
+    """
     quantitative_prompt = f"""Analyze the following interview transcript and predict PHQ-8 scores for each symptom domain.
 
 Interview transcript:
@@ -395,8 +585,6 @@ def main():
     
     # Get participants to process (starting from index 40)
     participants_to_process = unique_participants[40:]
-    # Participants that didn't process
-    participants_to_process = [319, 336, 356, 372, 376, 400, 404, 422, 441, 474]
 
     log_message(f"Total participants to process: {len(participants_to_process)}")
     
