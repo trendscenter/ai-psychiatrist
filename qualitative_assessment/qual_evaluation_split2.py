@@ -5,6 +5,23 @@ import json
 import re
 from requests.exceptions import Timeout, RequestException
 
+# only include failed IDs
+df = df[df['participant_id'].isin(failed_participant_ids)]
+print(f"Filtered to {len(df)} failed participants to process")
+
+if len(df) == 0:
+    print("ERROR: No matching participants found in the CSV file!")
+    print("Make sure the participant_id column exists and contains the expected values")
+    exit()
+
+
+results = []
+failed_evaluations = []
+processed_count = 0
+
+
+import os
+
 def parse_score_and_explanation(response_text):
     """Extract score and explanation from model response"""
     score_patterns = [
@@ -49,22 +66,7 @@ print("Loading CSV file...")
 df = pd.read_csv(input_csv_path)
 print(f"Loaded {len(df)} total participants")
 
-# only include failed IDs
-df = df[df['participant_id'].isin(failed_participant_ids)]
-print(f"Filtered to {len(df)} failed participants to process")
 
-if len(df) == 0:
-    print("ERROR: No matching participants found in the CSV file!")
-    print("Make sure the participant_id column exists and contains the expected values")
-    exit()
-
-
-results = []
-failed_evaluations = []
-processed_count = 0
-
-
-import os
 if os.path.exists(output_csv_path):
     print(f"Found existing results file: {output_csv_path}")
     existing_results = pd.read_csv(output_csv_path)
