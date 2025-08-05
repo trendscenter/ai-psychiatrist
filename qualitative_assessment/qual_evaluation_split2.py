@@ -22,7 +22,23 @@ processed_count = 0
 
 
 def parse_score_and_explanation(response_text):
-    """Extract score and explanation from model response"""
+    """
+    Extract score and explanation from model response
+
+    Parameters
+    ----------
+   response_text : str
+   Output from the model containing scores and explanation.
+
+    Returns
+    -------
+    int or None, str
+        score :   int or None
+            The extracted score between 1 and 10, if found. Returns None if no valid score is found.
+        explanation : str 
+              The original response text without leading/trailing whitespace.
+            
+    """
     score_patterns = [
         r'score[:\s]*(\d+)',
         r'(\d+)[/\s]*(?:out of\s*)?10',
