@@ -36,8 +36,7 @@ def parse_score_and_explanation(response_text):
         score :   int or None
             The extracted score between 1 and 10, if found. Returns None if no valid score is found.
         explanation : str 
-              The original response text without leading/trailing whitespace.
-            
+              The original response text without leading/trailing whitespace.       
     """
     score_patterns = [
         r'score[:\s]*(\d+)',
