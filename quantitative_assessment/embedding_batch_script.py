@@ -24,8 +24,8 @@ model = "gemma3-optimized:27b"
 
 # Output paths
 OUTPUT_DIR = r"/data/users2/agreene46/ai-psychiatrist/analysis_output"
-JSONL_FILE = os.path.join(OUTPUT_DIR, "embedding_results_analysis.jsonl")
-LOG_FILE = os.path.join(OUTPUT_DIR, "embedding_log_file.txt")
+JSONL_FILE = os.path.join(OUTPUT_DIR, "oss_embedding_results_analysis.jsonl")
+LOG_FILE = os.path.join(OUTPUT_DIR, "oss_embedding_log_file.txt")
 
 # Ensure output directory exists
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -379,7 +379,7 @@ def process_evidence_for_references(evidence_dict, participant_embedded_transcri
         Dictionary containing PHQ-8 domain keys mapped to lists of evidence quotes
     
     participant_embedded_transcripts : dict
-        Dict of embedded chunks of the reference transcripts and their participant IDs
+        The dictionary with participant IDs as keys and (raw_text, embedding) as values for each transcript chunk
     
     phq8_ground_truths : pandas dataframe
         Dataframe containing ground truth PHQ-8 scores for participants
