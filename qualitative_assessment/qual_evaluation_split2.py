@@ -3,10 +3,41 @@ import requests
 import time
 import json
 import re
+import os
 from requests.exceptions import Timeout, RequestException
 
+# only include failed IDs
+df = df[df['participant_id'].isin(failed_participant_ids)]
+print(f"Filtered to {len(df)} failed participants to process")
+
+if len(df) == 0:
+    print("ERROR: No matching participants found in the CSV file!")
+    print("Make sure the participant_id column exists and contains the expected values")
+    exit()
+
+
+results = []
+failed_evaluations = []
+processed_count = 0
+
+
 def parse_score_and_explanation(response_text):
-    """Extract score and explanation from model response"""
+    """
+    Extract score and explanation from model response
+
+    Parameters
+    ----------
+   response_text : str
+   Output from the model containing scores and explanation.
+
+    Returns
+    -------
+    int or None, str
+        score :   int or None
+            The extracted score between 1 and 10, if found. Returns None if no valid score is found.
+        explanation : str 
+              The original response text without leading/trailing whitespace.       
+    """
     score_patterns = [
         r'score[:\s]*(\d+)',
         r'(\d+)[/\s]*(?:out of\s*)?10',
@@ -33,41 +64,48 @@ model = "gemma3-optimized:27b" # TODO: Change this variable to the model you wan
 
 # File paths
 input_csv_path = "/data/users2/nblair7/analysis_results/qual_resultsfin.csv"
-output_csv_path = "/home/users/nblair7/ai-psychiatrist/eval_results.csv" 
+output_csv_path = "/data/users2/nblair7/analysis_results/eval_results_split.csv"  
+
+# failed IDs
+failed_participant_ids = [
+    478, 479, 485, 486, 487, 488, 491, 302, 307, 331, 335, 346, 367, 377, 381, 382, 
+    388, 389, 390, 395, 403, 404, 406, 413, 417, 418, 420, 422, 436, 439, 440, 451, 
+    458, 472, 476, 477, 482, 483, 484, 489, 490, 492
+]
+
+print(f"Processing only these {len(failed_participant_ids)} failed participants: {failed_participant_ids}")
 
 # Load the CSV file
 print("Loading CSV file...")
 df = pd.read_csv(input_csv_path)
-print(f"Loaded {len(df)} participants")
+print(f"Loaded {len(df)} total participants")
 
 
-results = []
-failed_evaluations = []
-processed_count = 0
-
-
-import os
 if os.path.exists(output_csv_path):
     print(f"Found existing results file: {output_csv_path}")
     existing_results = pd.read_csv(output_csv_path)
-    completed_subjects = set(existing_results['participant_id'].tolist())
-    print(f"Already completed {len(completed_subjects)} subjects")
     
-  
+    
+    good_results = existing_results[~existing_results['participant_id'].isin(failed_participant_ids)]
+    print(f"Preserving {len(good_results)} existing good results")
+    
+    completed_failed = existing_results[existing_results['participant_id'].isin(failed_participant_ids)]
+    completed_subjects = set(completed_failed['participant_id'].tolist())
+    print(f"Already completed {len(completed_subjects)} of the failed subjects")
+    
     df = df[~df['participant_id'].isin(completed_subjects)]
-    print(f"Remaining subjects to process: {len(df)}")
-    
-   
+    print(f"Remaining failed subjects to process: {len(df)}")
     results = existing_results.to_dict('records')
 else:
     print("No existing results found, starting fresh")
     completed_subjects = set()
 
+
 for index, row in df.iterrows():
     participant_id = row['participant_id']
     qualitative_assessment = row['qualitative_assessment']
     
-    print(f"\n--- Processing {index + 1}/{len(df)}: {participant_id} ---")
+    print(f"\n--- Processing {index + 1}/{len(df)}: {participant_id} (FAILED RETRY) ---")
     
     start_time = time.time()
     
@@ -166,9 +204,10 @@ Score: [your score]
         "options": {"temperature": 0, "top_k": 20, "top_p": 0.9}
     }
     
-    timeout = 300  
+    timeout = 300  # 5 minutes
     
     try:
+        
         result = {'participant_id': participant_id}
         
         # coherence
@@ -210,7 +249,7 @@ Score: [your score]
         
         time.sleep(2)
         
-        # accuracy
+        # accuaracy
         print("  Getting accuracy response...")
         accuracy_response = requests.post(BASE_URL, json=accuracy_request, timeout=timeout-10)
         if accuracy_response.status_code == 200:
@@ -260,13 +299,13 @@ Score: [your score]
     time.sleep(1)
 
 # Summary
-print(f"Summary of processing:")
-print(f"Total subjects: {len(df) + len(completed_subjects)}")
-print(f"Previously completed: {len(completed_subjects)}")
+print(f"summary of processing:")
+print(f"Total failed subjects to retry: {len(failed_participant_ids)}")
+print(f"Previously completed in retry file: {len(completed_subjects)}")
 print(f"Successfully processed this run: {processed_count}")
 print(f"Total results collected: {len(results)}")
 
-# results
+# Final results
 if results:
     resultsdf = pd.DataFrame(results)
     resultsdf.to_csv(output_csv_path, index=False)
@@ -280,3 +319,5 @@ if results:
     print(f"- collective_explanation")
 else:
     print("No results to save!")
+
+print(f"\nFailed participant IDs processed: {failed_participant_ids}")
