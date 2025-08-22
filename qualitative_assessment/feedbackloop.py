@@ -30,39 +30,37 @@ def parse_score_and_explanation(response_text):
     return score, response_text.strip()
 
 # Configuration
-OLLAMA_NODE = "arctrddgxa004" # TODO: Change this variable to the node where Ollama is running
+OLLAMA_NODE = "arctrddgxa002" # TODO: Change this variable to the node where Ollama is running
 BASE_URL = f"http://{OLLAMA_NODE}:11434/api/chat"
 model = "gemma3-optimized:27b" # TODO: Change this variable to the model you want to use
 
-# FAILED IDs TO PROCESS - Add your failed participant IDs here
-FAILED_IDS = [
-    380, 383, 385, 386, 391, 392, 393, 397, 400, 401, 402, 409, 412, 414, 415, 416, 419, 423, 425, 426, 427, 428, 429, 430, 433, 434, 437, 441, 443, 444, 445, 446, 447, 448, 449, 454, 455, 456, 457, 459, 463, 464, 468, 471, 473, 474, 475, 478, 479, 485, 486, 487, 488, 491, 302, 307, 331, 335, 346, 367, 377, 381, 382, 388, 389, 390, 395, 403, 404, 406, 413, 417, 418, 420, 422, 436, 439, 440, 451, 458, 472, 476, 477, 482, 483, 484, 489, 490, 492
+# All Ids 
+ID_NUM = [
+    302, 303, 304, 305, 307, 310, 312, 313, 315, 316, 317, 318, 319, 320, 321, 322, 324, 325, 326, 327, 328, 330, 331, 333, 335, 336, 338, 339, 340, 341, 343, 344, 345, 346, 347, 348, 350, 351, 352, 353, 355, 356, 357, 358, 360, 362, 363, 364, 366, 367, 368, 369, 370, 371, 372, 374, 375, 376, 377, 379, 380, 381, 382, 383, 385, 386, 388, 389, 390, 391, 392, 393, 395, 397, 400, 401, 402, 403, 404, 406, 409, 412, 413, 414, 415, 416, 417, 418, 419, 420, 422, 423, 425, 426, 427, 428, 429, 430, 433, 434, 436, 437, 439, 440, 441, 443, 444, 445, 446, 447, 448, 449, 451, 454, 455, 456, 457, 458, 459, 463, 464, 468, 471, 472, 473, 474, 475, 476, 477, 478, 479, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492
 ]
 
 # Input file 
 input_csv_path = "/data/users2/nblair7/analysis_results/qual_resultsfin.csv"  
 
 #Output files
-feedback_assessments_csv = "/data/users2/nblair7/analysis_results/ASSESSMENT.csv"  # re-evaluated qualitative assessments
+feedback_assessments_csv = "/data/users2/nblair7/analysis_results/ASSESSMENTF.csv"  # re-evaluated qualitative assessments
 feedback_evaluations_csv = "/data/users2/nblair7/analysis_results/SCORES.csv"  # re-evaluated evaluation scores
 
-print("=== ENHANCED FEEDBACK LOOP RE-EVALUATION SYSTEM (FAILED IDs ONLY) ===")
+
 print(f"Input file: {input_csv_path}")
-print(f"Failed IDs to process: {FAILED_IDS}")
+print(f"Failed IDs to process: {ID_NUM}")
 print(f"Feedback assessments file: {feedback_assessments_csv}")
 print(f"Feedback evaluations file: {feedback_evaluations_csv}")
 
 # Load the CSV file
-print("Loading CSV file...")
 df = pd.read_csv(input_csv_path)
 print(f"Loaded {len(df)} participants")
 
-# Filter to only process failed IDs
-if FAILED_IDS:
-    df = df[df['participant_id'].astype(str).isin([str(pid) for pid in FAILED_IDS])]
-    print(f"Filtered to {len(df)} failed participants to reprocess")
+if ID_NUM:
+    df = df[df['participant_id'].astype(str).isin([str(pid) for pid in ID_NUM])]
+    print(f" {len(df)} participants to reprocess")
 else:
-    print("WARNING: No failed IDs specified in FAILED_IDS list. Please add them to the FAILED_IDS variable.")
+
     exit(1)
 
 feedback_assessments = []  # Store re-evaluated qualitative assessments
@@ -348,7 +346,7 @@ Here is the assessment based on the transcript:
 - **{metric.upper()}** scored {current_scores[metric]}/5 because: {current_explanations[metric]}
   Please specifically improve the {metric_description[metric]} in your revised assessment.""")
                 
-                # Enhanced regeneration prompt with feedback context
+                
                 system_prompt = "You are a psychiatrist. Your job is to assess and diagnose patients for depression. Be as objective, concise, and accurate as possible."
                 
                 feedback_prompt = f"""The following is an interview transcript from a psychiatric assessment of a subject who is being screened for depression. Please note that 'Ellie' is the interviewer, and 'Participant' is the subject being assessed.
@@ -421,7 +419,7 @@ Please answer in this XML format with each tag on a new line, properly indented.
                     break
                 
                 current_assessment = feedback_response.json()['message']['content']
-                print(f"    New assessment generated with targeted improvements, re-evaluating...")
+                print(f"    New evaluation generating... ")
                 
                 # Re-evaluate with new assessment
                 new_coherence_prompt = coherence_prompt.replace(qualitative_assessment, current_assessment)
