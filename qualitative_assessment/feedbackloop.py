@@ -30,22 +30,21 @@ def parse_score_and_explanation(response_text):
     return score, response_text.strip()
 
 # Configuration
-OLLAMA_NODE = "arctrddgxa002" # TODO: Change this variable to the node where Ollama is running
+OLLAMA_NODE = "arctrdagn032" # TODO: Change this variable to the node where Ollama is running
 BASE_URL = f"http://{OLLAMA_NODE}:11434/api/chat"
 model = "gemma3-optimized:27b" # TODO: Change this variable to the model you want to use
 
-# All Ids 
+#All Ids 
 ID_NUM = [
-    302, 303, 304, 305, 307, 310, 312, 313, 315, 316, 317, 318, 319, 320, 321, 322, 324, 325, 326, 327, 328, 330, 331, 333, 335, 336, 338, 339, 340, 341, 343, 344, 345, 346, 347, 348, 350, 351, 352, 353, 355, 356, 357, 358, 360, 362, 363, 364, 366, 367, 368, 369, 370, 371, 372, 374, 375, 376, 377, 379, 380, 381, 382, 383, 385, 386, 388, 389, 390, 391, 392, 393, 395, 397, 400, 401, 402, 403, 404, 406, 409, 412, 413, 414, 415, 416, 417, 418, 419, 420, 422, 423, 425, 426, 427, 428, 429, 430, 433, 434, 436, 437, 439, 440, 441, 443, 444, 445, 446, 447, 448, 449, 451, 454, 455, 456, 457, 458, 459, 463, 464, 468, 471, 472, 473, 474, 475, 476, 477, 478, 479, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492
+    302, 304, 305, 307, 310, 313, 317, 318, 319, 320, 326, 335, 338, 339, 343, 346, 347, 351, 353, 357, 358, 360, 362, 364, 369, 371, 377, 383, 388, 389, 390, 392, 395, 397, 400, 402, 403, 409, 412, 415, 416, 423, 429, 441, 443, 445, 446, 448, 454, 457, 464, 474, 475, 479, 485, 486, 487
 ]
 
 # Input file 
-input_csv_path = "/data/users2/nblair7/analysis_results/qual_resultsfin.csv"  
+input_csv_path = "/data/users2/nblair7/analysis_results/GEMMAAPPENDEDASSESSMENTS.csv"  
 
 #Output files
-feedback_assessments_csv = "/data/users2/nblair7/analysis_results/ASSESSMENTF.csv"  # re-evaluated qualitative assessments
-feedback_evaluations_csv = "/data/users2/nblair7/analysis_results/SCORES.csv"  # re-evaluated evaluation scores
-
+feedback_assessments_csv = "/data/users2/nblair7/analysis_results/qual_reassessment_GEMMA20.csv"  # re-evaluated qualitative assessments
+feedback_evaluations_csv = "/data/users2/nblair7/analysis_results/qual_scores_GEMMA20.csv"  # re-evaluated evaluation scores
 
 print(f"Input file: {input_csv_path}")
 print(f"Failed IDs to process: {ID_NUM}")
@@ -91,7 +90,8 @@ if completed_subjects:
 
 for index, row in df.iterrows():
     participant_id = row['participant_id']
-    qualitative_assessment = row['qualitative_assessment']
+    qualitative_assessment = str(row['qualitative_assessment']) if 'qualitative_assessment' in row else ""
+    qualitative_assessment = qualitative_assessment.replace("\n", " ")
     
     print(f"\n--- Processing {index + 1}/{len(df)}: {participant_id} ---")
     
@@ -129,7 +129,7 @@ Score from 1-5 solely based on the following criteria:
  - score of 3 : 3-4 mistakes
  - score of 2 : 5-6 mistakes
  - score of 1 : 7 or more mistakes
-
+*NO FLOATING POINT SCORES, ONLY INTEGERS 1-5*
 Coherence (1–5): Is the response logically consistent? Mistakes are logically inconsistent statements or contradictions within the assessment.
 
 Format your response as:
@@ -152,7 +152,7 @@ Score from 1-5 solely based on the following criteria:
  - score of 3 : 3-4 mistakes
  - score of 2 : 5-6 mistakes
  - score of 1 : 7 or more mistakes
-
+*NO FLOATING POINT SCORES, ONLY INTEGERS 1-5*
 Completeness (1–5): Does the assessment cover all relevant symptoms, severities, duration/frequency? Mistakes have missed PHQ-8 symptoms, or duration/frequency details.
 
 Format your response as:
@@ -174,7 +174,7 @@ Score from 1-5 solely based on the following criteria:
  - score of 3 : 3-4 mistakes
  - score of 2 : 5-6 mistakes
  - score of 1 : 7 or more mistakes
-
+*NO FLOATING POINT SCORES, ONLY INTEGERS 1-5*
 specificity (1–5): Is the assessment specific? Mistakes include using vague/generic statements like 'the patient seems depressed'.
 
 Format your response as:
@@ -197,7 +197,7 @@ Score from 1-5 solely based on the following criteria:
  - score of 3 : 3-4 mistakes
  - score of 2 : 5-6 mistakes
  - score of 1 : 7 or more mistakes
-
+*NO FLOATING POINT SCORES, ONLY INTEGERS 1-5*
 Accuracy (1–5): Are the signs/symptoms aligned with DSM-5 or PHQ-8? Mistakes are incorrect symptoms or incorrect duration/frequecy. 
 
 Format your response as:
@@ -311,7 +311,7 @@ Here is the assessment based on the transcript:
         # Check if any score is <= 3 to trigger feedback loop
         low_scores = []
         for metric in ['coherence', 'completeness', 'specificity', 'accuracy']:
-            if initial_scores[metric] and initial_scores[metric] <= 3:
+            if initial_scores[metric] and initial_scores[metric] <= 2:
                 low_scores.append(metric)
         
         if low_scores:
@@ -320,7 +320,7 @@ Here is the assessment based on the transcript:
             
             # Keep track of all attempts for this participant
             iteration = 0
-            max_iterations = 10  # Prevent infinite loops
+            max_iterations = 20  # Prevent infinite loops
             current_assessment = qualitative_assessment
             current_scores = initial_scores.copy()
             current_explanations = initial_explanations.copy()
@@ -365,43 +365,64 @@ TASK:
 Please reassess the transcript and provide an improved qualitative assessment that addresses the specific feedback above. Build upon the original assessment but focus on improving the identified weaknesses.
 
 Please:
-1. Provide an overall qualitative assessment of the subject's mental health. 
-2. Summarize social aspects that may influence the subject's mental health. (ex. familial relationships, friendship dynamics, work environment, etc. that are relevant to the subject's mental health)
-3. Summarize biological aspects that may influence the subject's mental health. (ex. familial history of mental health issues, previous or pre-existing mental health issues, stress levels, etc. that are relevant to the subject's mental health)
-4. Identify potential risk factors the subject may be experiencing.
-5. Use exact quotes from the transcript to support your assessment for each tag.
+      1. Provide an overall qualitative assessment of the subject's mental health.
+      2. Summarize PHQ-8 symptoms if available (if not, state 'not available'), as well as frequency and severity if available.
+      3. Summarize social aspects that may influence the subject's mental health. (ex. familial relationships, frienship dynamics, work environment, etc. that are relevant to the subjects mental health)
+      4. Summarize biological aspects that may influence the subject's mental health. (ex. famillial history of mental health issues, previous or pre-existing mental health issues, stress levels, etc. that are relevant to the subjects mental health)
+      5. Identify potential risk factors the subject may be experiencing.
+      6. Use exact quotes from the transcript to support your assessment for each tag.
 
-Output should be formatted as bullet points with headings for each section using stars. Example: **Tiredness** <explanation of tiredness>. Do not include any additional text outside the bullet points.
+      Output should be formatted as bullet points with headings for each section using stars. Example: **Tiredness** <explanation of tiredness>. Do not include any additional text outside the bullet points
+      Please answer in this XML format with each tag on a new line, properly indented. Use straight quotes instead of curly quotes, and do not include any additional text outside the XML tags:
 
-Please answer in this XML format with each tag on a new line, properly indented. Use straight quotes instead of curly quotes, and do not include any additional text outside the XML tags:
+      <assessment>
+        <!-- Summary of participant's overall mental health -->
+       <exact_quotes>
+        <!-- Quotes from the transcript that support the assessment -->
+        </exact_quotes>
+      </assessment>
 
-<assessment>
-  <!-- Summary of participant's overall mental health -->
-  <exact_quotes>
-    <!-- Quotes from the transcript that support the assessment -->
-  </exact_quotes>
-</assessment>
+      <PHQ8_symptoms>
+        <!-- Summary of PHQ-8 symptoms mentioned in the trancript:
+        - Little interest or pleasure in doing things
+        - Feeling down, depressed, or hopeless
+        - Trouble falling or staying asleep, or sleeping too much
+        - Feeling tired or having little energy
+        - Poor appetite or overeating
+        - Feeling bad about yourself — or that you are a failure or have let yourself or your
+          family down
+        - Trouble concentrating on things, such as reading the newspaper or watching television
+        - Moving or speaking so slowly that other people could have noticed? Or the opposite — being so fidgety or restless that you have been moving around a lot more than usual
+        For each symptom present, note:
+        - Frequency (daily, several days, more than half the days, nearly every day)
+        - Duration (how long experienced)
+        - Severity/impact on functioning
 
-<social_factors>
-  <!-- Summary of social influences on patient's health -->
-  <exact_quotes>
-    <!-- Quotes from the transcript that support the assessment -->
-  </exact_quotes>
-</social_factors>
+       If symptoms are not discussed, state "not assessed in interview" -->
 
-<biological_factors>
-  <!-- Summary of biological influences on patient's health -->
-  <exact_quotes>
-    <!-- Quotes from the transcript that support the assessment -->
-  </exact_quotes>
-</biological_factors>
+       <exact_quotes>
+        <!-- Quotes from the transcript that support the assessment -->
+        </exact_quotes>
+      </PHQ8_symptoms>
 
-<risk_factors>
-  <!-- Summary of potential risk factors -->
-  <exact_quotes>
-    <!-- Quotes from the transcript that support the assessment -->
-  </exact_quotes>
-</risk_factors>
+      <social_factors>
+        <!-- Summary of social influences on patient's health -->
+        <exact_quotes>
+      </social_factors>
+
+      <biological_factors>
+        <!-- Summary of biological influences on patient's health -->
+       <exact_quotes>
+        <!-- Quotes from the transcript that support the assessment -->
+        </exact_quotes>
+      </biological_factors>
+
+      <risk_factors>
+        <!-- Summary of potential risk factors -->
+         <exact_quotes>
+       <!-- Quotes from the transcript that support the assessment -->
+       </exact_quotes>
+      </risk_factors>
 """
                 
                 feedback_request = {
@@ -419,94 +440,100 @@ Please answer in this XML format with each tag on a new line, properly indented.
                     break
                 
                 current_assessment = feedback_response.json()['message']['content']
-                print(f"    New evaluation generating... ")
+                print(f"    New assessment generated, re-evaluating only low scores: {low_scores}")
                 
-                # Re-evaluate with new assessment
-                new_coherence_prompt = coherence_prompt.replace(qualitative_assessment, current_assessment)
-                new_completeness_prompt = completeness_prompt.replace(qualitative_assessment, current_assessment)
-                new_specificity_prompt = specificity_prompt.replace(qualitative_assessment, current_assessment)
-                new_accuracy_prompt = accuracy_prompt.replace(qualitative_assessment, current_assessment)
-                
-                # Store new scores and explanations
+                # UPDATED: Only re-evaluate the metrics that scored low
                 new_scores = {}
                 new_explanations = {}
                 
-                # Re-evaluate coherence
-                time.sleep(2)
-                new_coherence_request = {
-                    "model": model,
-                    "messages": [{"role": "user", "content": new_coherence_prompt}],
-                    "stream": False,
-                    "options": {"temperature": 0, "top_k": 20, "top_p": 0.9}
-                }
-                new_coherence_response = requests.post(BASE_URL, json=new_coherence_request, timeout=timeout-10)
-                if new_coherence_response.status_code == 200:
-                    new_coherence_content = new_coherence_response.json()['message']['content']
-                    new_coherence_score, _ = parse_score_and_explanation(new_coherence_content)
-                    new_scores['coherence'] = new_coherence_score
-                    new_explanations['coherence'] = new_coherence_content
+                for metric in low_scores:
+                    time.sleep(2)  # Rate limiting
+                    
+                    if metric == 'coherence':
+                        new_coherence_prompt = coherence_prompt.replace(qualitative_assessment, current_assessment)
+                        new_coherence_request = {
+                            "model": model,
+                            "messages": [{"role": "user", "content": new_coherence_prompt}],
+                            "stream": False,
+                            "options": {"temperature": 0, "top_k": 20, "top_p": 0.9}
+                        }
+                        response = requests.post(BASE_URL, json=new_coherence_request, timeout=timeout-10)
+                        if response.status_code == 200:
+                            content = response.json()['message']['content']
+                            score, _ = parse_score_and_explanation(content)
+                            new_scores['coherence'] = score
+                            new_explanations['coherence'] = content
+                            print(f"      Coherence re-evaluated: {score}")
+                    
+                    elif metric == 'completeness':
+                        new_completeness_prompt = completeness_prompt.replace(qualitative_assessment, current_assessment)
+                        new_completeness_request = {
+                            "model": model,
+                            "messages": [{"role": "user", "content": new_completeness_prompt}],
+                            "stream": False,
+                            "options": {"temperature": 0, "top_k": 20, "top_p": 0.9}
+                        }
+                        response = requests.post(BASE_URL, json=new_completeness_request, timeout=timeout-10)
+                        if response.status_code == 200:
+                            content = response.json()['message']['content']
+                            score, _ = parse_score_and_explanation(content)
+                            new_scores['completeness'] = score
+                            new_explanations['completeness'] = content
+                            print(f"      Completeness re-evaluated: {score}")
+                    
+                    elif metric == 'specificity':
+                        new_specificity_prompt = specificity_prompt.replace(qualitative_assessment, current_assessment)
+                        new_specificity_request = {
+                            "model": model,
+                            "messages": [{"role": "user", "content": new_specificity_prompt}],
+                            "stream": False,
+                            "options": {"temperature": 0, "top_k": 20, "top_p": 0.9}
+                        }
+                        response = requests.post(BASE_URL, json=new_specificity_request, timeout=timeout-10)
+                        if response.status_code == 200:
+                            content = response.json()['message']['content']
+                            score, _ = parse_score_and_explanation(content)
+                            new_scores['specificity'] = score
+                            new_explanations['specificity'] = content
+                            print(f"      Specificity re-evaluated: {score}")
+                    
+                    elif metric == 'accuracy':
+                        new_accuracy_prompt = accuracy_prompt.replace(qualitative_assessment, current_assessment)
+                        new_accuracy_request = {
+                            "model": model,
+                            "messages": [{"role": "user", "content": new_accuracy_prompt}],
+                            "stream": False,
+                            "options": {"temperature": 0, "top_k": 20, "top_p": 0.9}
+                        }
+                        response = requests.post(BASE_URL, json=new_accuracy_request, timeout=timeout-10)
+                        if response.status_code == 200:
+                            content = response.json()['message']['content']
+                            score, _ = parse_score_and_explanation(content)
+                            new_scores['accuracy'] = score
+                            new_explanations['accuracy'] = content
+                            print(f"      Accuracy re-evaluated: {score}")
                 
-                # Re-evaluate completeness
-                time.sleep(2)
-                new_completeness_request = {
-                    "model": model,
-                    "messages": [{"role": "user", "content": new_completeness_prompt}],
-                    "stream": False,
-                    "options": {"temperature": 0, "top_k": 20, "top_p": 0.9}
-                }
-                new_completeness_response = requests.post(BASE_URL, json=new_completeness_request, timeout=timeout-10)
-                if new_completeness_response.status_code == 200:
-                    new_completeness_content = new_completeness_response.json()['message']['content']
-                    new_completeness_score, _ = parse_score_and_explanation(new_completeness_content)
-                    new_scores['completeness'] = new_completeness_score
-                    new_explanations['completeness'] = new_completeness_content
+                # Update ONLY the re-evaluated scores, keep the good ones unchanged
+                for metric, score in new_scores.items():
+                    if score is not None:
+                        current_scores[metric] = score
+                        current_explanations[metric] = new_explanations[metric]
                 
-                # Re-evaluate specificity
-                time.sleep(2)
-                new_specificity_request = {
-                    "model": model,
-                    "messages": [{"role": "user", "content": new_specificity_prompt}],
-                    "stream": False,
-                    "options": {"temperature": 0, "top_k": 20, "top_p": 0.9}
-                }
-                new_specificity_response = requests.post(BASE_URL, json=new_specificity_request, timeout=timeout-10)
-                if new_specificity_response.status_code == 200:
-                    new_specificity_content = new_specificity_response.json()['message']['content']
-                    new_specificity_score, _ = parse_score_and_explanation(new_specificity_content)
-                    new_scores['specificity'] = new_specificity_score
-                    new_explanations['specificity'] = new_specificity_content
-                
-                # Re-evaluate accuracy
-                time.sleep(2)
-                new_accuracy_request = {
-                    "model": model,
-                    "messages": [{"role": "user", "content": new_accuracy_prompt}],
-                    "stream": False,
-                    "options": {"temperature": 0, "top_k": 20, "top_p": 0.9}
-                }
-                new_accuracy_response = requests.post(BASE_URL, json=new_accuracy_request, timeout=timeout-10)
-                if new_accuracy_response.status_code == 200:
-                    new_accuracy_content = new_accuracy_response.json()['message']['content']
-                    new_accuracy_score, _ = parse_score_and_explanation(new_accuracy_content)
-                    new_scores['accuracy'] = new_accuracy_score
-                    new_explanations['accuracy'] = new_accuracy_content
-                
-                # Update current scores and explanations for next iteration
-                current_scores.update(new_scores)
-                current_explanations.update(new_explanations)
-                
-                # Check which scores are still low
+                # Check which scores are STILL low (check all metrics, not just re-evaluated ones)
                 low_scores = []
                 for metric in ['coherence', 'completeness', 'specificity', 'accuracy']:
-                    if metric in new_scores and new_scores[metric] and new_scores[metric] <= 3:
+                    if current_scores.get(metric) and current_scores[metric] <= 2:
                         low_scores.append(metric)
                 
-                # Print current scores
+                # Print current scores with indicators for what was re-evaluated
+                re_eval_indicators = {metric: " (re-evaluated)" if metric in new_scores else "" 
+                                    for metric in ['coherence', 'completeness', 'specificity', 'accuracy']}
+                
                 print(f"    Iteration {iteration} scores: " + 
-                      f"Coherence={current_scores.get('coherence', 'N/A')}, " +
-                      f"Completeness={current_scores.get('completeness', 'N/A')}, " +
-                      f"Specificity={current_scores.get('specificity', 'N/A')}, " +
-                      f"Accuracy={current_scores.get('accuracy', 'N/A')}")
+                      f"Coherence={current_scores.get('coherence', 'N/A')}{re_eval_indicators['coherence']}, " +
+                      f"Completeness={current_scores.get('completeness', 'N/A')}{re_eval_indicators['completeness']}, " +
+                      f"Specificity={current_scores.get('specificity', 'N/A')}{re_eval_indicators['specificity']}, " +
+                      f"Accuracy={current_scores.get('accuracy', 'N/A')}{re_eval_indicators['accuracy']}")
                 
                 if low_scores:
                     print(f"    Still have low scores: {low_scores}, continuing with targeted feedback...")
@@ -601,4 +628,4 @@ if feedback_evaluations:
     print(f"- accuracy, accuracy_explanation")
 
 if not feedback_assessments and not feedback_evaluations:
-    print("No participants required feedback - no CSV files created!")
+    print("No participants required feedback processing, no files created.")
