@@ -8,10 +8,10 @@ OLLAMA_NODE = "arctrddgxa002" # TODO: Change this variable to the node where Oll
 BASE_URL = f"http://{OLLAMA_NODE}:11434/api/chat"
 model = "gemma3:27b" # TODO: Change this variable to the model you want to use
 
-train_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/train_split_Depression_AVEC2017.csv")
-dev_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/dev_split_Depression_AVEC2017.csv")
+train_path = pd.read_csv("/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/train_split_Depression_AVEC2017.csv")
+dev_path = pd.read_csv("/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/dev_split_Depression_AVEC2017.csv")
 
-test_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/test_split_Depression_AVEC2017.csv")
+test_path = pd.read_csv("/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/test_split_Depression_AVEC2017.csv")
 
 #id_train = train_path.iloc[:, 0].tolist()
 #id_dev = dev_path.iloc[:, 0].tolist()
@@ -39,7 +39,7 @@ for i, (participant_id, dataset_type) in enumerate(all_subjects):
     
     start_time = time.time()
     
-    id_transcript = os.path.join("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/", f"{participant_id}_P", f"{participant_id}_TRANSCRIPT.csv")
+    id_transcript = os.path.join("/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/", f"{participant_id}_P", f"{participant_id}_TRANSCRIPT.csv")
     
     print(f"Looking for transcript at: {id_transcript}")
     
@@ -182,13 +182,13 @@ for i, (participant_id, dataset_type) in enumerate(all_subjects):
             if len(results) == 1 or len(results) % 10 == 0 or len(results) == len(all_subjects):
                 # Save main results
                 resultsdf = pd.DataFrame(results)
-                output_file = "/data/users2/nblair7/new_analysis_results/TESTSUBJECTS.csv"
+                output_file = "/data/users2/user/new_analysis_results/TESTSUBJECTS.csv"
                 resultsdf.to_csv(output_file, index=False)
                 print(f"Checkpoint save: {len(results)} participants saved to {output_file}")
                 
                 # Save timing results
                 timing_df = pd.DataFrame(timing_results)
-                timing_file = "/data/users2/nblair7/new_analysis_results/qual_runtime_GEMMA.csv"
+                timing_file = "/data/users2/user/new_analysis_results/qual_runtime_GEMMA.csv"
                 timing_df.to_csv(timing_file, index=False)
                 print(f"Timing checkpoint save: {len(timing_results)} participants saved to {timing_file}")
                 
@@ -226,13 +226,13 @@ print(f"Results collected: {len(results)}")
 if results:
     # Save main results file
     resultsdf = pd.DataFrame(results)
-    output_file = "/data/users2/nblair7/new_analysis_results/TESTSUBJECTS.csv"
+    output_file = "/data/users2/user/new_analysis_results/TESTSUBJECTS.csv"
     resultsdf.to_csv(output_file, index=False)
     print(f"Saved results to: {output_file}")
 
 if runtime_results:
     runtime_df = pd.DataFrame(runtime_results)
-    runtime_output_file = "/home/users/nblair7/ai-psychiatrist/runtime_results.csv"
+    runtime_output_file = "/home/users/user/ai-psychiatrist/runtime_results.csv"
     runtime_df.to_csv(runtime_output_file, index=False)
     print(f"Saved runtime results to: {runtime_output_file}")
 else:
