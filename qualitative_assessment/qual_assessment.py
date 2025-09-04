@@ -4,16 +4,12 @@ import pandas as pd
 import os
 import time
 
-
-
-OLLAMA_NODE = "arctrdagn036" # TODO: Change this variable to the node where Ollama is running
+OLLAMA_NODE = "arctrddgxa002" # TODO: Change this variable to the node where Ollama is running
 BASE_URL = f"http://{OLLAMA_NODE}:11434/api/chat"
 model = "gemma3:27b" # TODO: Change this variable to the model you want to use
 
-
-
-#train_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/train_split_Depression_AVEC2017.csv")
-#dev_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/dev_split_Depression_AVEC2017.csv")
+train_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/train_split_Depression_AVEC2017.csv")
+dev_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/dev_split_Depression_AVEC2017.csv")
 
 test_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/test_split_Depression_AVEC2017.csv")
 
@@ -22,13 +18,10 @@ test_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_data
 
 id_test = test_path.iloc[:, 0].tolist()
 
-
-#print(f"Number of train subjects: {len(id_train)}")
-#print(f"Number of dev subjects: {len(id_dev)}")
-print(f"Number of test subjects: {len(id_test)}")
-#print("First 3 train subjects:", id_train[:3] if len(id_train) >= 3 else id_train)
-#print("First 3 dev subjects:", id_dev[:3] if len(id_dev) >= 3 else id_dev)
-print(f"First 3 test subjects: {id_test[:3] if len(id_test) >= 3 else id_test}")
+print(f"Number of train subjects: {len(id_train)}")
+print(f"Number of dev subjects: {len(id_dev)}")
+print("First 3 train subjects:", id_train[:3] if len(id_train) >= 3 else id_train)
+print("First 3 dev subjects:", id_dev[:3] if len(id_dev) >= 3 else id_dev)
 
 #all_subjects = [(subj, 'train') for subj in id_train] + [(subj, 'dev') for subj in id_dev]
 
@@ -37,12 +30,14 @@ all_subjects = [(subj, 'test') for subj in id_test]
 print(f"Total subjects to process: {len(all_subjects)}")
 
 results = []
-timing_results = []
+runtime_results = []
 processed_count = 0
 skipped_count = 0
 
 for i, (participant_id, dataset_type) in enumerate(all_subjects):
     print(f"\n--- Processing {i+1}/{len(all_subjects)}: {participant_id} ({dataset_type} dataset) ---")
+    
+    start_time = time.time()
     
     id_transcript = os.path.join("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/", f"{participant_id}_P", f"{participant_id}_TRANSCRIPT.csv")
     
@@ -51,6 +46,11 @@ for i, (participant_id, dataset_type) in enumerate(all_subjects):
     if not os.path.exists(id_transcript):
         print(f"Transcript not found for {participant_id}")
         skipped_count += 1
+        runtime_results.append({
+            "participant_id": participant_id,
+            "status": "skipped",
+            "runtime_seconds": time.time() - start_time
+        })
         continue
 
     print(f"Transcript found, loading data...")
@@ -104,47 +104,6 @@ for i, (participant_id, dataset_type) in enumerate(all_subjects):
         - Severity/impact on functioning
 
        If symptoms are not discussed, state "not assessed in interview" -->
-
-       <little_interest_or_pleasure>
-        <!-- Details on this symptom -->
-        <!-- Frequency, duration, severity if available -->
-       </little_interest or pleasure>
-
-        <feeling_down_depressed_hopeless>
-        <!-- Details on this symptom -->
-        <!-- Frequency, duration, severity if available -->
-        </feeling_down_depressed_hopeless>
-
-        <trouble_sleeping>
-        <!-- Details on this symptom -->
-        <!-- Frequency, duration, severity if available -->
-        </trouble_sleeping>
-
-        <feeling_tired_little_energy>
-        <!-- Details on this symptom -->
-        <!-- Frequency, duration, severity if available -->
-        </feeling_tired_little_energy>
-
-        <poor_appetite_overeating>
-        <!-- Details on this symptom -->
-        <!-- Frequency, duration, severity if available -->
-        </poor_appetite_overeating>
-
-        <feeling_bad_about_self>
-        <!-- Details on this symptom -->
-        <!-- Frequency, duration, severity if available -->
-        </feeling_bad_about_self>
-
-        <trouble_concentrating>
-        <!-- Details on this symptom -->
-        <!-- Frequency, duration, severity if available -->
-        </trouble_concentrating>
-
-        <moving_speaking_slowly_or_fidgety>
-        <!-- Details on this symptom -->
-        <!-- Frequency, duration, severity if available -->
-        </moving_speaking_slowly_or_fidgety>
-
 
        <exact_quotes>
         <!-- Quotes from the transcript that support the assessment -->
@@ -210,12 +169,10 @@ for i, (participant_id, dataset_type) in enumerate(all_subjects):
                 "qualitative_assessment": qual_content
             })
             
-            # Separate timing data
-            timing_results.append({
+            runtime_results.append({
                 "participant_id": participant_id,
-                "dataset_type": dataset_type,
-                "runtime_seconds": runtime_seconds,
-                "dialogue_length": len(full_dialogue)
+                "status": "success",
+                "runtime_seconds": time.time() - start_time
             })
             
             processed_count += 1
@@ -243,12 +200,21 @@ for i, (participant_id, dataset_type) in enumerate(all_subjects):
         else:
             print(f"API request failed with status code: {response.status_code}")
             print(f"Response: {response.text}")
-            print(f"Failed request runtime: {runtime_seconds:.2f} seconds")
+            runtime_results.append({
+                "participant_id": participant_id,
+                "status": "failed",
+                "runtime_seconds": time.time() - start_time
+            })
             
     except Exception as e:
         print(f"Error processing {participant_id}: {str(e)}")
         import traceback
         traceback.print_exc()
+        runtime_results.append({
+            "participant_id": participant_id,
+            "status": "error",
+            "runtime_seconds": time.time() - start_time
+        })
         continue
 
 print(f"Summary of processing:")
@@ -257,7 +223,6 @@ print(f"Successfully processed: {processed_count}")
 print(f"Skipped (no transcript): {skipped_count}")
 print(f"Results collected: {len(results)}")
 
-
 if results:
     # Save main results file
     resultsdf = pd.DataFrame(results)
@@ -265,20 +230,10 @@ if results:
     resultsdf.to_csv(output_file, index=False)
     print(f"Saved results to: {output_file}")
 
-if timing_results:
-    # Save separate timing file
-    timing_df = pd.DataFrame(timing_results)
-    timing_file = "/data/users2/nblair7/new_analysis_results/qual_runtime_GEMMA.csv"
-    timing_df.to_csv(timing_file, index=False)
-    print(f"Saved timing data to: {timing_file}")
-    
-    # Runtime statistics
-    print(f"\nRuntime Statistics:")
-    print(f"Average runtime: {timing_df['runtime_seconds'].mean():.2f} seconds")
-    print(f"Median runtime: {timing_df['runtime_seconds'].median():.2f} seconds")
-    print(f"Min runtime: {timing_df['runtime_seconds'].min():.2f} seconds")
-    print(f"Max runtime: {timing_df['runtime_seconds'].max():.2f} seconds")
-    print(f"Total processing time: {timing_df['runtime_seconds'].sum():.2f} seconds ({timing_df['runtime_seconds'].sum()/60:.1f} minutes)")
-    
+if runtime_results:
+    runtime_df = pd.DataFrame(runtime_results)
+    runtime_output_file = "/home/users/nblair7/ai-psychiatrist/runtime_results.csv"
+    runtime_df.to_csv(runtime_output_file, index=False)
+    print(f"Saved runtime results to: {runtime_output_file}")
 else:
     print("No results to save!")

@@ -215,3 +215,4 @@ __marimo__/
 *.out
 *.err
 *.m
+*.pkl
