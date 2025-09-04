@@ -37,7 +37,7 @@ def extract_response(response_text, key_list):
     return output_dict
 
 def main():
-    OLLAMA_NODE = "arctrdagn033" # TODO: Change this variable to the node where Ollama is running
+    OLLAMA_NODE = "arctrdgn001" # TODO: Change this variable to the node where Ollama is running
     BASE_URL = f"http://{OLLAMA_NODE}:11434/api/chat"
 
     model = "gemma3-optimized:27b" # TODO: Change this variable to the model you want to use
@@ -48,11 +48,10 @@ def main():
     output_filename = "meta_review_test.csv"
 
     # Load qualitative assessment
-    qual_df = pd.read_csv(os.path.join(rootdir, "analysis_output/qual_results.csv"))
+    qual_df = pd.read_csv(os.path.join(rootdir, "analysis_output/qual/qual_assessment_GEMMA.csv"))
 
     # Load quantitative assessment
-    # quan_list = load_jsonl(os.path.join(rootdir, "analysis_output/embedding_results_analysis.jsonl"))
-    quan_list = load_jsonl(os.path.join(rootdir, "analysis_output/test_set_chunk_4_step_2_examples_3_embedding_results_analysis.jsonl"))
+    quan_list = load_jsonl(os.path.join(rootdir, "analysis_output/quan/chunk_8_step_2_examples_2_embedding_results_analysis_2.jsonl"))
 
     phq8_questions = [
         'PHQ8_NoInterest', 'PHQ8_Depressed', 'PHQ8_Sleep', 'PHQ8_Tired',
@@ -115,9 +114,8 @@ def main():
         <quantitative_assessment>\n{quan_output}</quantitative_assessment>
 
         According to the Patient Health Questionnaire eight-item depression scale (PHQ-8), a total PHQ-8 score of 0 to 4 represents no significant depressive symptoms; a total score of 5 to 9 represents mild depressive symptoms; 10 to 14, moderate; 15 to 19, moderately severe; and 20 to 24, severe. \
-        Note that the interview might not discuss all eight PHQ-8 items, so please try your best to predict the participant's condition based on the available information. \
-        Given the interview transcript and assessments above, please predict a binary diagnosis label in <diagnosis> tags where 0 means that the participant has no depressive symptoms and 1 means that the participant has depressive symptoms. \
-        Please also predict their severity level in <severity> tags, where 0 means no significant depressive symptoms, 1 means mild symptoms, 2 means moderate symptoms, 3 means moderately severe symptoms, and 4 means severe symptoms. \
+        Note that the interview may not cover all eight PHQ-8 items. Therefore, directly summing the available scores and deriving a severity level could underestimate the participant's condition. Please use the available information to infer and predict the participant's condition as accurately as possible. \
+        Please predict their severity level in <severity> tags, where 0 means no significant depressive symptoms, 1 means mild symptoms, 2 means moderate symptoms, 3 means moderately severe symptoms, and 4 means severe symptoms. \
         Please explain your predictions in <explanation> tags. Please provide answers in the XML format with each tag on a new line.
         """
 
@@ -129,7 +127,12 @@ def main():
             "model": model,
             "messages": [{"role": "system", "content": system_prompt},
                         {"role": "user", "content": meta_reviewer_prompt}],
-            "stream": False
+            "stream": False,
+            "options": {
+                "temperature": 0,
+                "top_k": 20,
+                "top_p": 1
+            }
         }
         )
 
@@ -141,7 +144,7 @@ def main():
         except KeyError:
             print("error")
 
-        output_key_list = ["diagnosis", "severity", "explanation"]
+        output_key_list = ["severity", "explanation"]
         prediction_dict = extract_response(response_text, output_key_list)
 
         output_dict = {"participant_id": participant_id, "response": response_text}
@@ -150,7 +153,7 @@ def main():
         output_list.append(output_dict)
 
     with open(output_filename, 'w', newline='') as csvfile:
-        fieldnames = ["participant_id", "response", "diagnosis", "severity", "explanation"]
+        fieldnames = ["participant_id", "response", "severity", "explanation"]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(output_list)
