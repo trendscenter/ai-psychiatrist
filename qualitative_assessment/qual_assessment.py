@@ -6,20 +6,27 @@ import time
 
 OLLAMA_NODE = "arctrddgxa002" # TODO: Change this variable to the node where Ollama is running
 BASE_URL = f"http://{OLLAMA_NODE}:11434/api/chat"
-model = "gemma3-optimized:27b" # TODO: Change this variable to the model you want to use
+model = "gemma3:27b" # TODO: Change this variable to the model you want to use
 
 train_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/train_split_Depression_AVEC2017.csv")
 dev_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/dev_split_Depression_AVEC2017.csv")
 
-id_train = train_path.iloc[:, 0].tolist()
-id_dev = dev_path.iloc[:, 0].tolist()
+test_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/test_split_Depression_AVEC2017.csv")
+
+#id_train = train_path.iloc[:, 0].tolist()
+#id_dev = dev_path.iloc[:, 0].tolist()
+
+id_test = test_path.iloc[:, 0].tolist()
 
 print(f"Number of train subjects: {len(id_train)}")
 print(f"Number of dev subjects: {len(id_dev)}")
 print("First 3 train subjects:", id_train[:3] if len(id_train) >= 3 else id_train)
 print("First 3 dev subjects:", id_dev[:3] if len(id_dev) >= 3 else id_dev)
 
-all_subjects = [(subj, 'train') for subj in id_train] + [(subj, 'dev') for subj in id_dev]
+#all_subjects = [(subj, 'train') for subj in id_train] + [(subj, 'dev') for subj in id_dev]
+
+
+all_subjects = [(subj, 'test') for subj in id_test]
 print(f"Total subjects to process: {len(all_subjects)}")
 
 results = []
@@ -106,6 +113,8 @@ for i, (participant_id, dataset_type) in enumerate(all_subjects):
       <social_factors>
         <!-- Summary of social influences on patient's health -->
         <exact_quotes>
+        <!-- Quotes from the transcript that support the assessment -->
+        </exact_quotes>
       </social_factors>
 
       <biological_factors>
@@ -125,6 +134,9 @@ for i, (participant_id, dataset_type) in enumerate(all_subjects):
         
         print(f"Sending API request...")
         
+        # Start timing
+        start_time = time.time()
+        
         response = requests.post(
           BASE_URL,
           json = {
@@ -140,11 +152,17 @@ for i, (participant_id, dataset_type) in enumerate(all_subjects):
           }
         )
         
+        # End timing
+        end_time = time.time()
+        runtime_seconds = end_time - start_time
+        
         if response.status_code == 200:
             qual_content = response.json()['message']['content']
             print(f"API response received (length: {len(qual_content)} chars)")
             print(f"Response preview: {qual_content[:100]}...")
+            print(f"Runtime: {runtime_seconds:.2f} seconds")
             
+            # Main results (separated from timing data)
             results.append({
                 "participant_id": participant_id,
                 "dataset_type": dataset_type,
@@ -159,6 +177,25 @@ for i, (participant_id, dataset_type) in enumerate(all_subjects):
             
             processed_count += 1
             print(f"Completed participant {participant_id} ({processed_count} total completed)")
+            
+            
+            if len(results) == 1 or len(results) % 10 == 0 or len(results) == len(all_subjects):
+                # Save main results
+                resultsdf = pd.DataFrame(results)
+                output_file = "/data/users2/nblair7/new_analysis_results/TESTSUBJECTS.csv"
+                resultsdf.to_csv(output_file, index=False)
+                print(f"Checkpoint save: {len(results)} participants saved to {output_file}")
+                
+                # Save timing results
+                timing_df = pd.DataFrame(timing_results)
+                timing_file = "/data/users2/nblair7/new_analysis_results/qual_runtime_GEMMA.csv"
+                timing_df.to_csv(timing_file, index=False)
+                print(f"Timing checkpoint save: {len(timing_results)} participants saved to {timing_file}")
+                
+                
+                print(f"\n=== FORMATTED PREVIEW OF PARTICIPANT {participant_id} ===")
+                print(qual_content)
+                print("=" * 60)
             
         else:
             print(f"API request failed with status code: {response.status_code}")
@@ -187,8 +224,9 @@ print(f"Skipped (no transcript): {skipped_count}")
 print(f"Results collected: {len(results)}")
 
 if results:
+    # Save main results file
     resultsdf = pd.DataFrame(results)
-    output_file = "/home/users/nblair7/ai-psychiatrist/qual_results.csv"
+    output_file = "/data/users2/nblair7/new_analysis_results/TESTSUBJECTS.csv"
     resultsdf.to_csv(output_file, index=False)
     print(f"Saved results to: {output_file}")
 
