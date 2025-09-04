@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH -J ollama
-#SBATCH -p qTRDGPUH
+#SBATCH -p qTRDGPU
 #SBATCH -A trends53c17
-#SBATCH -t 08:00:00
+#SBATCH -t 15:15:00
 #SBATCH -c 24
-#SBATCH --mem=100g
-#SBATCH --gres=gpu:V100:2
+#SBATCH --mem=50g
+#SBATCH --gres=gpu:A40:2
 #SBATCH -e err%A-%a.err
 #SBATCH -o out%A-%a.out
 
@@ -29,6 +29,3 @@ export OLLAMA_BACKEND=gpu
 
 # Run ollama serve
 ollama serve
-
-
-
