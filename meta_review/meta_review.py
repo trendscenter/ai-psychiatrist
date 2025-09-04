@@ -42,7 +42,7 @@ def main():
 
     model = "gemma3-optimized:27b" # TODO: Change this variable to the model you want to use
 
-    rootdir = "/data/users4/user/ai-psychiatrist"
+    rootdir = "/data/users4/xli/ai-psychiatrist"
 
     output_list = []
     output_filename = "meta_review_test.csv"

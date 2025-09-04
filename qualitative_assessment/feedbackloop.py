@@ -40,11 +40,11 @@ ID_NUM = [
 ]
 
 # Input file 
-input_csv_path = "/data/users2/user/analysis_results/GEMMAAPPENDEDASSESSMENTS.csv"  
+input_csv_path = "/data/users2/nblair7/analysis_results/GEMMAAPPENDEDASSESSMENTS.csv"  
 
 #Output files
-feedback_assessments_csv = "/data/users2/user/analysis_results/qual_reassessment_GEMMA20.csv"  # re-evaluated qualitative assessments
-feedback_evaluations_csv = "/data/users2/user/analysis_results/qual_scores_GEMMA20.csv"  # re-evaluated evaluation scores
+feedback_assessments_csv = "/data/users2/nblair7/analysis_results/qual_reassessment_GEMMA20.csv"  # re-evaluated qualitative assessments
+feedback_evaluations_csv = "/data/users2/nblair7/analysis_results/qual_scores_GEMMA20.csv"  # re-evaluated evaluation scores
 
 print(f"Input file: {input_csv_path}")
 print(f"Failed IDs to process: {ID_NUM}")
@@ -96,7 +96,7 @@ for index, row in df.iterrows():
     print(f"\n--- Processing {index + 1}/{len(df)}: {participant_id} ---")
     
     # Load transcript for this participant
-    id_transcript = os.path.join("/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/", f"{participant_id}_P", f"{participant_id}_TRANSCRIPT.csv")
+    id_transcript = os.path.join("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/", f"{participant_id}_P", f"{participant_id}_TRANSCRIPT.csv")
     print(f"Looking for transcript at: {id_transcript}")
     
     if not os.path.exists(id_transcript):

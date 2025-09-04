@@ -703,7 +703,7 @@ if __name__ == "__main__":
     model = "gemma3-optimized:27b" #gpt-oss:20b
 
     # Output paths
-    OUTPUT_DIR = r"/data/users2/user/ai-psychiatrist/analysis_output"
+    OUTPUT_DIR = r"/data/users2/agreene46/ai-psychiatrist/analysis_output"
     LOG_FILE = os.path.join(OUTPUT_DIR, "embedding_log_file.txt")
     
     # Ensure output directory exists
@@ -721,8 +721,8 @@ if __name__ == "__main__":
     
     # Load data
     log_message("Loading PHQ-8 ground truth data...")
-    dev_split_phq8 = pd.read_csv(r"/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/dev_split_Depression_AVEC2017.csv")
-    train_split_phq8 = pd.read_csv(r"/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/train_split_Depression_AVEC2017.csv")
+    dev_split_phq8 = pd.read_csv(r"/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/dev_split_Depression_AVEC2017.csv")
+    train_split_phq8 = pd.read_csv(r"/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/train_split_Depression_AVEC2017.csv")
     phq8_ground_truths = pd.concat([dev_split_phq8, train_split_phq8], ignore_index=True)
     phq8_ground_truths = phq8_ground_truths.sort_values('Participant_ID').reset_index(drop=True)
     
@@ -868,9 +868,9 @@ if __name__ == "__main__":
         for dim in dims:
             # Load embeddings
             if dim:
-                pickle_file = fr"/data/users2/user/ai-psychiatrist/{chunk_step}_dim_{str(dim)}_participant_embedded_transcripts.pkl"
+                pickle_file = fr"/data/users2/agreene46/ai-psychiatrist/{chunk_step}_dim_{str(dim)}_participant_embedded_transcripts.pkl"
             else:
-                pickle_file = fr"/data/users2/user/ai-psychiatrist/{chunk_step}_participant_embedded_transcripts.pkl"
+                pickle_file = fr"/data/users2/agreene46/ai-psychiatrist/{chunk_step}_participant_embedded_transcripts.pkl"
 
             log_message(f"Loading participant embeddings{' with dim=' + dim if dim else ''}...")
             try:
@@ -926,7 +926,7 @@ if __name__ == "__main__":
                             try:
                                 with timeout(600):  # 10 minutes of processing, afterwards the attempt is re-tried. Done to handle infinite looping
                                     # Load transcript
-                                    transcript_path = fr"/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/{participant_id}_P/{participant_id}_TRANSCRIPT.csv"
+                                    transcript_path = fr"/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/{participant_id}_P/{participant_id}_TRANSCRIPT.csv"
                                     current_transcript = pd.read_csv(transcript_path, sep="\t")
                                     
                                     # Handle missing values
