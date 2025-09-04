@@ -216,3 +216,5 @@ __marimo__/
 *.err
 *.m
 *.pkl
+*.tar.gz
+*.mat
