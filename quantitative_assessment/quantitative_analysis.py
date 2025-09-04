@@ -8,7 +8,7 @@ import csv
 from datetime import datetime
 
 # Ollama Config
-OLLAMA_NODE = "arctrdagn032"
+OLLAMA_NODE = "arctrddgxa004"
 BASE_URL = f"http://{OLLAMA_NODE}:11434/api/chat"
 
 model = "gemma3-optimized:27b" # qwq:latest
