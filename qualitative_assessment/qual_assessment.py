@@ -8,10 +8,10 @@ OLLAMA_NODE = "arctrddgxa002" # TODO: Change this variable to the node where Oll
 BASE_URL = f"http://{OLLAMA_NODE}:11434/api/chat"
 model = "gemma3:27b" # TODO: Change this variable to the model you want to use
 
-train_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/train_split_Depression_AVEC2017.csv")
-dev_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/dev_split_Depression_AVEC2017.csv")
+train_path = pd.read_csv("/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/train_split_Depression_AVEC2017.csv")
+dev_path = pd.read_csv("/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/dev_split_Depression_AVEC2017.csv")
 
-test_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/test_split_Depression_AVEC2017.csv")
+test_path = pd.read_csv("/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/test_split_Depression_AVEC2017.csv")
 
 #id_train = train_path.iloc[:, 0].tolist()
 #id_dev = dev_path.iloc[:, 0].tolist()
@@ -39,7 +39,7 @@ for i, (participant_id, dataset_type) in enumerate(all_subjects):
     
     start_time = time.time()
     
-    id_transcript = os.path.join("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/", f"{participant_id}_P", f"{participant_id}_TRANSCRIPT.csv")
+    id_transcript = os.path.join("/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/", f"{participant_id}_P", f"{participant_id}_TRANSCRIPT.csv")
     
     print(f"Looking for transcript at: {id_transcript}")
     
