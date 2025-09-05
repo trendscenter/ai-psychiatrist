@@ -182,13 +182,13 @@ for i, (participant_id, dataset_type) in enumerate(all_subjects):
             if len(results) == 1 or len(results) % 10 == 0 or len(results) == len(all_subjects):
                 # Save main results
                 resultsdf = pd.DataFrame(results)
-                output_file = "/data/users2/nblair7/new_analysis_results/TESTSUBJECTS.csv"
+                output_file = "/data/users2/user/new_analysis_results/TESTSUBJECTS.csv"
                 resultsdf.to_csv(output_file, index=False)
                 print(f"Checkpoint save: {len(results)} participants saved to {output_file}")
                 
                 # Save timing results
                 timing_df = pd.DataFrame(timing_results)
-                timing_file = "/data/users2/nblair7/new_analysis_results/qual_runtime_GEMMA.csv"
+                timing_file = "/data/users2/user/new_analysis_results/qual_runtime_GEMMA.csv"
                 timing_df.to_csv(timing_file, index=False)
                 print(f"Timing checkpoint save: {len(timing_results)} participants saved to {timing_file}")
                 
@@ -226,13 +226,13 @@ print(f"Results collected: {len(results)}")
 if results:
     # Save main results file
     resultsdf = pd.DataFrame(results)
-    output_file = "/data/users2/nblair7/new_analysis_results/TESTSUBJECTS.csv"
+    output_file = "/data/users2/user/new_analysis_results/TESTSUBJECTS.csv"
     resultsdf.to_csv(output_file, index=False)
     print(f"Saved results to: {output_file}")
 
 if runtime_results:
     runtime_df = pd.DataFrame(runtime_results)
-    runtime_output_file = "/home/users/nblair7/ai-psychiatrist/runtime_results.csv"
+    runtime_output_file = "/home/users/user/ai-psychiatrist/runtime_results.csv"
     runtime_df.to_csv(runtime_output_file, index=False)
     print(f"Saved runtime results to: {runtime_output_file}")
 else:
