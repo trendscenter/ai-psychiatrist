@@ -11,22 +11,17 @@ model = "gemma3:27b" # TODO: Change this variable to the model you want to use
 train_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/train_split_Depression_AVEC2017.csv")
 dev_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/dev_split_Depression_AVEC2017.csv")
 
-test_path = pd.read_csv("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/test_split_Depression_AVEC2017.csv")
-
-#id_train = train_path.iloc[:, 0].tolist()
-#id_dev = dev_path.iloc[:, 0].tolist()
-
-id_test = test_path.iloc[:, 0].tolist()
+id_train = train_path.iloc[:, 0].tolist()
+id_dev = dev_path.iloc[:, 0].tolist()
 
 print(f"Number of train subjects: {len(id_train)}")
 print(f"Number of dev subjects: {len(id_dev)}")
 print("First 3 train subjects:", id_train[:3] if len(id_train) >= 3 else id_train)
 print("First 3 dev subjects:", id_dev[:3] if len(id_dev) >= 3 else id_dev)
 
-#all_subjects = [(subj, 'train') for subj in id_train] + [(subj, 'dev') for subj in id_dev]
+all_subjects = [(subj, 'train') for subj in id_train] + [(subj, 'dev') for subj in id_dev]
 
 
-all_subjects = [(subj, 'test') for subj in id_test]
 print(f"Total subjects to process: {len(all_subjects)}")
 
 results = []
@@ -187,10 +182,10 @@ for i, (participant_id, dataset_type) in enumerate(all_subjects):
                 print(f"Checkpoint save: {len(results)} participants saved to {output_file}")
                 
                 # Save timing results
-                timing_df = pd.DataFrame(timing_results)
+                timing_df = pd.DataFrame(runtime_results)
                 timing_file = "/data/users2/nblair7/new_analysis_results/qual_runtime_GEMMA.csv"
-                timing_df.to_csv(timing_file, index=False)
-                print(f"Timing checkpoint save: {len(timing_results)} participants saved to {timing_file}")
+                timing_df.to_csv(runtime_file, index=False)
+                print(f"Timing checkpoint save: {len(runtime_results)} participants saved to {timing_file}")
                 
                 
                 print(f"\n=== FORMATTED PREVIEW OF PARTICIPANT {participant_id} ===")
