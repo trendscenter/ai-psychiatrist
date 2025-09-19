@@ -32,19 +32,23 @@ def parse_score_and_explanation(response_text):
 # Configuration
 OLLAMA_NODE = "arctrdagn032" # TODO: Change this variable to the node where Ollama is running
 BASE_URL = f"http://{OLLAMA_NODE}:11434/api/chat"
-model = "gemma3-optimized:27b" # TODO: Change this variable to the model you want to use
+model = "alibayram/medgemma:27b" # TODO: Change this variable to the model you want to use
 
 #All Ids 
 ID_NUM = [
-    302, 304, 305, 307, 310, 313, 317, 318, 319, 320, 326, 335, 338, 339, 343, 346, 347, 351, 353, 357, 358, 360, 362, 364, 369, 371, 377, 383, 388, 389, 390, 392, 395, 397, 400, 402, 403, 409, 412, 415, 416, 423, 429, 441, 443, 445, 446, 448, 454, 457, 464, 474, 475, 479, 485, 486, 487
-]
+414, 415, 416, 419, 423, 425, 426, 427, 428, 429, 430, 433, 434, 437, 441, 
+443, 444, 445, 446, 447, 448, 449, 454, 455, 456, 457, 459, 463, 464, 468, 
+471, 473, 474, 475, 478, 479, 485, 486, 487, 488, 491, 302, 307, 331, 335, 
+346, 367, 377, 381, 382, 403, 404, 406, 413, 417, 418, 420, 422, 436, 439, 
+440, 451, 458, 472, 476, 477, 482, 483, 484, 489, 490, 492
 
+    ]
 # Input file 
-input_csv_path = "/data/users2/nblair7/analysis_results/GEMMAAPPENDEDASSESSMENTS.csv"  
+input_csv_path = "/data/users3/fborhan1/ai-psychiatrist/qualitative_assessment_results.csv"  
 
 #Output files
-feedback_assessments_csv = "/data/users2/nblair7/analysis_results/qual_reassessment_GEMMA20.csv"  # re-evaluated qualitative assessments
-feedback_evaluations_csv = "/data/users2/nblair7/analysis_results/qual_scores_GEMMA20.csv"  # re-evaluated evaluation scores
+feedback_assessments_csv = "/data/users3/fborhan1/ai-psychiatrist/medgemma_assesmentsplit2.csv"  # re-evaluated qualitative assessments
+feedback_evaluations_csv = "/data/users3/fborhan1/ai-psychiatrist/medgemma_eval.csv"  # re-evaluated evaluation scores
 
 print(f"Input file: {input_csv_path}")
 print(f"Failed IDs to process: {ID_NUM}")
@@ -91,9 +95,29 @@ if completed_subjects:
 for index, row in df.iterrows():
     participant_id = row['participant_id']
     qualitative_assessment = str(row['qualitative_assessment']) if 'qualitative_assessment' in row else ""
-    qualitative_assessment = qualitative_assessment.replace("\n", " ")
     
     print(f"\n--- Processing {index + 1}/{len(df)}: {participant_id} ---")
+    
+    #cleaner input text
+    if qualitative_assessment.startswith('```xml'):
+        qualitative_assessment = qualitative_assessment[6:]  
+        print("  Removed ```xml prefix")
+    if qualitative_assessment.endswith('```'):
+        qualitative_assessment = qualitative_assessment[:-3]  
+        print("  Removed ``` suffix")
+
+    qualitative_assessment = qualitative_assessment.strip()
+
+    
+    if len(qualitative_assessment) > 3000:  
+        qualitative_assessment = qualitative_assessment[:3000] + "..."
+        print("  Truncated long assessment")
+
+    
+    qualitative_assessment = re.sub(r'<[^>]+>', '', qualitative_assessment)  
+    qualitative_assessment = re.sub(r'\s+', ' ', qualitative_assessment)      
+    
+    print(f"  After cleaning, first 200 chars: {qualitative_assessment[:200]}")
     
     # Load transcript for this participant
     id_transcript = os.path.join("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/", f"{participant_id}_P", f"{participant_id}_TRANSCRIPT.csv")
@@ -260,6 +284,11 @@ Here is the assessment based on the transcript:
         else:
             initial_scores['coherence'] = None
             initial_explanations['coherence'] = None
+
+
+            print(f"FULL RAW RESPONSE: {coherence_response.text}")
+            print(f"RESPONSE HEADERS: {coherence_response.headers}")  
+            print(f"REQUEST PAYLOAD: {coherence_request}")
         
         time.sleep(2)
         
@@ -320,7 +349,7 @@ Here is the assessment based on the transcript:
             
             # Keep track of all attempts for this participant
             iteration = 0
-            max_iterations = 20  # Prevent infinite loops
+            max_iterations = 10  # Prevent infinite loops
             current_assessment = qualitative_assessment
             current_scores = initial_scores.copy()
             current_explanations = initial_explanations.copy()
