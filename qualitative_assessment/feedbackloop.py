@@ -6,8 +6,6 @@ import json
 import re
 from requests.exceptions import Timeout, RequestException
 
-
-
 def parse_score_and_explanation(response_text):
     """Extract score and explanation from model response"""
     score_patterns = [
@@ -41,14 +39,14 @@ ID_NUM = [
 471, 473, 474, 475, 478, 479, 485, 486, 487, 488, 491, 302, 307, 331, 335, 
 346, 367, 377, 381, 382, 403, 404, 406, 413, 417, 418, 420, 422, 436, 439, 
 440, 451, 458, 472, 476, 477, 482, 483, 484, 489, 490, 492
+]
 
-    ]
 # Input file 
 input_csv_path = "/data/users3/fborhan1/ai-psychiatrist/qualitative_assessment_results.csv"  
 
 #Output files
-feedback_assessments_csv = "/data/users3/fborhan1/ai-psychiatrist/medgemma_assesmentsplit2.csv"  # re-evaluated qualitative assessments
-feedback_evaluations_csv = "/data/users3/fborhan1/ai-psychiatrist/medgemma_eval.csv"  # re-evaluated evaluation scores
+feedback_assessments_csv = "/data/users3/fborhan1/ai-psychiatrist/medgemma_assesmentsplit2.csv"
+feedback_evaluations_csv = "/data/users3/fborhan1/ai-psychiatrist/medgemma_eval.csv"
 
 print(f"Input file: {input_csv_path}")
 print(f"Failed IDs to process: {ID_NUM}")
@@ -63,11 +61,10 @@ if ID_NUM:
     df = df[df['participant_id'].astype(str).isin([str(pid) for pid in ID_NUM])]
     print(f" {len(df)} participants to reprocess")
 else:
-
     exit(1)
 
-feedback_assessments = []  # Store re-evaluated qualitative assessments
-feedback_evaluations = []  # Store re-evaluated evaluation scores
+feedback_assessments = []
+feedback_evaluations = []
 processed_count = 0
 skipped_count = 0
 feedback_count = 0
@@ -107,12 +104,10 @@ for index, row in df.iterrows():
         print("  Removed ``` suffix")
 
     qualitative_assessment = qualitative_assessment.strip()
-
     
     if len(qualitative_assessment) > 3000:  
         qualitative_assessment = qualitative_assessment[:3000] + "..."
         print("  Truncated long assessment")
-
     
     qualitative_assessment = re.sub(r'<[^>]+>', '', qualitative_assessment)  
     qualitative_assessment = re.sub(r'\s+', ' ', qualitative_assessment)      
@@ -145,7 +140,7 @@ for index, row in df.iterrows():
     
     start_time = time.time()
     
-    # Original evaluation prompts (for initial assessment to determine if feedback is needed)
+    # Original evaluation prompts
     coherence_prompt = f"""Evaluate the following qualitative assessment output for COHERENCE only. Compare qualitative_assessment to the provided transcript. Consider the qualitative assessment (qualitative_assessment) of the transcript (transcript) and compare qualitative_assessment to the provided transcript.
 Score from 1-5 solely based on the following criteria: 
  - score of 5 : 0 mistakes
@@ -284,8 +279,6 @@ Here is the assessment based on the transcript:
         else:
             initial_scores['coherence'] = None
             initial_explanations['coherence'] = None
-
-
             print(f"FULL RAW RESPONSE: {coherence_response.text}")
             print(f"RESPONSE HEADERS: {coherence_response.headers}")  
             print(f"REQUEST PAYLOAD: {coherence_request}")
@@ -337,7 +330,7 @@ Here is the assessment based on the transcript:
         
         time.sleep(2)
         
-        # Check if any score is <= 3 to trigger feedback loop
+        # Check if any score is <= 2 to trigger feedback loop
         low_scores = []
         for metric in ['coherence', 'completeness', 'specificity', 'accuracy']:
             if initial_scores[metric] and initial_scores[metric] <= 2:
@@ -349,134 +342,200 @@ Here is the assessment based on the transcript:
             
             # Keep track of all attempts for this participant
             iteration = 0
-            max_iterations = 10  # Prevent infinite loops
+            max_iterations = 10
             current_assessment = qualitative_assessment
             current_scores = initial_scores.copy()
             current_explanations = initial_explanations.copy()
-            all_low_scores = []  # Track which scores were low across iterations
             
-            # Feedback loop - keep trying until all scores are 4 or 5
+            # Feedback loop - keep trying until all scores are > 2
             while low_scores and iteration < max_iterations:
                 iteration += 1
                 print(f"    Iteration {iteration}: Improving assessment for low scores: {low_scores}")
-                all_low_scores.extend(low_scores)
                 
-                # Build feedback message for low scoring metrics
+                # feedback message for low scoring metrics
                 feedback_details = []
                 for metric in low_scores:
                     if current_scores[metric] and current_explanations[metric]:
                         metric_description = {
                             'coherence': 'logical consistency (avoiding contradictions within the assessment)',
-                            'completeness': 'comprehensive coverage (including all relevant PHQ-8 symptoms, severities, and duration/frequency details)',
-                            'specificity': 'specific details (avoiding vague/generic statements like "the patient seems depressed")',
-                            'accuracy': 'accuracy according to DSM-5 or PHQ-8 criteria (correct symptoms and duration/frequency)'
+                            'completeness': 'comprehensive coverage (including all relevant aspects)',
+                            'specificity': 'specific details (avoiding vague/generic statements)',
+                            'accuracy': 'accuracy according to DSM-5 or PHQ-8 criteria'
                         }
                         feedback_details.append(f"""
 - **{metric.upper()}** scored {current_scores[metric]}/5 because: {current_explanations[metric]}
   Please specifically improve the {metric_description[metric]} in your revised assessment.""")
                 
+                system_prompt = "You are a psychiatrist. Your job is to assess and diagnose patients for depression. Be as objective, concise, and accurate as possible. Be specific and avoid vague generalities."
                 
-                system_prompt = "You are a psychiatrist. Your job is to assess and diagnose patients for depression. Be as objective, concise, and accurate as possible."
-                
-                feedback_prompt = f"""The following is an interview transcript from a psychiatric assessment of a subject who is being screened for depression. Please note that 'Ellie' is the interviewer, and 'Participant' is the subject being assessed.
-
-TRANSCRIPT:
-{transcript}
-
-ORIGINAL ASSESSMENT:
-{qualitative_assessment}
+                # Overall assessment:
+                print("    Generating improved overall assessment...")
+                overall_prompt = f"""The following is an interview transcript from a psychiatric assessment of a subject who is being screened for depression. Please note that 'Ellie' is the interviewer, and 'Participant' is the subject being assessed.
 
 EVALUATION FEEDBACK:
 The original assessment has been evaluated and needs improvement in the following areas:
 {chr(10).join(feedback_details)}
 
-TASK:
-Please reassess the transcript and provide an improved qualitative assessment that addresses the specific feedback above. Build upon the original assessment but focus on improving the identified weaknesses.
+TRANSCRIPT:
+{transcript}
 
-Please:
-      1. Provide an overall qualitative assessment of the subject's mental health.
-      2. Summarize PHQ-8 symptoms if available (if not, state 'not available'), as well as frequency and severity if available.
-      3. Summarize social aspects that may influence the subject's mental health. (ex. familial relationships, frienship dynamics, work environment, etc. that are relevant to the subjects mental health)
-      4. Summarize biological aspects that may influence the subject's mental health. (ex. famillial history of mental health issues, previous or pre-existing mental health issues, stress levels, etc. that are relevant to the subjects mental health)
-      5. Identify potential risk factors the subject may be experiencing.
-      6. Use exact quotes from the transcript to support your assessment for each tag.
+Provide an improved overall qualitative assessment of the subject's mental health that addresses the feedback above.
 
-      Output should be formatted as bullet points with headings for each section using stars. Example: **Tiredness** <explanation of tiredness>. Do not include any additional text outside the bullet points
-      Please answer in this XML format with each tag on a new line, properly indented. Use straight quotes instead of curly quotes, and do not include any additional text outside the XML tags:
+Please answer in this XML format. Use straight quotes instead of curly quotes, and do not include any additional text outside the XML tags:
 
-      <assessment>
-        <!-- Summary of participant's overall mental health -->
-       <exact_quotes>
-        <!-- Quotes from the transcript that support the assessment -->
-        </exact_quotes>
-      </assessment>
-
-      <PHQ8_symptoms>
-        <!-- Summary of PHQ-8 symptoms mentioned in the trancript:
-        - Little interest or pleasure in doing things
-        - Feeling down, depressed, or hopeless
-        - Trouble falling or staying asleep, or sleeping too much
-        - Feeling tired or having little energy
-        - Poor appetite or overeating
-        - Feeling bad about yourself — or that you are a failure or have let yourself or your
-          family down
-        - Trouble concentrating on things, such as reading the newspaper or watching television
-        - Moving or speaking so slowly that other people could have noticed? Or the opposite — being so fidgety or restless that you have been moving around a lot more than usual
-        For each symptom present, note:
-        - Frequency (daily, several days, more than half the days, nearly every day)
-        - Duration (how long experienced)
-        - Severity/impact on functioning
-
-       If symptoms are not discussed, state "not assessed in interview" -->
-
-       <exact_quotes>
-        <!-- Quotes from the transcript that support the assessment -->
-        </exact_quotes>
-      </PHQ8_symptoms>
-
-      <social_factors>
-        <!-- Summary of social influences on patient's health -->
-        <exact_quotes>
-      </social_factors>
-
-      <biological_factors>
-        <!-- Summary of biological influences on patient's health -->
-       <exact_quotes>
-        <!-- Quotes from the transcript that support the assessment -->
-        </exact_quotes>
-      </biological_factors>
-
-      <risk_factors>
-        <!-- Summary of potential risk factors -->
-         <exact_quotes>
-       <!-- Quotes from the transcript that support the assessment -->
-       </exact_quotes>
-      </risk_factors>
+<assessment>Summary of participant's overall mental health</assessment>
+<quotes>Exact quotes from the transcript that support the assessment</quotes>
 """
                 
-                feedback_request = {
-                    "model": model,
-                    "messages": [{"role": "system", "content": system_prompt},
-                               {"role": "user", "content": feedback_prompt}],
-                    "stream": False,
-                    "options": {"temperature": 0, "top_k": 20, "top_p": 0.9}
-                }
+                overall_response = requests.post(
+                    BASE_URL,
+                    json={
+                        "model": model,
+                        "messages": [{"role": "system", "content": system_prompt},
+                                   {"role": "user", "content": overall_prompt}],
+                        "stream": False,
+                        "options": {"temperature": 0, "top_k": 20, "top_p": 0.9}
+                    },
+                    timeout=timeout
+                )
                 
-                feedback_response = requests.post(BASE_URL, json=feedback_request, timeout=timeout)
-                if feedback_response.status_code != 200:
-                    print(f"    Failed to regenerate assessment: {feedback_response.status_code}")
+                if overall_response.status_code != 200:
+                    print(f"    Failed to regenerate overall assessment: {overall_response.status_code}")
                     failed_evaluations.append(participant_id)
                     break
+                overall_content = overall_response.json()['message']['content']
                 
-                current_assessment = feedback_response.json()['message']['content']
+                # Social factors:
+                print("    Generating improved social factors...")
+                social_prompt = f"""The following is an interview transcript from a psychiatric assessment of a subject who is being screened for depression. Please note that 'Ellie' is the interviewer, and 'Participant' is the subject being assessed.
+
+EVALUATION FEEDBACK:
+{chr(10).join(feedback_details)}
+
+TRANSCRIPT:
+{transcript}
+
+Summarize social aspects that may influence the subject's mental health (ex. familial relationships, friendship dynamics, work environment, etc.) addressing the feedback above.
+
+Please answer in this XML format. Use straight quotes instead of curly quotes:
+
+<assessment>Summary of social influences on patient's health</assessment>
+<quotes>Quotes from the transcript that support the assessment</quotes>
+"""
+                
+                social_response = requests.post(
+                    BASE_URL,
+                    json={
+                        "model": model,
+                        "messages": [{"role": "system", "content": system_prompt},
+                                   {"role": "user", "content": social_prompt}],
+                        "stream": False,
+                        "options": {"temperature": 0, "top_k": 20, "top_p": 0.9}
+                    },
+                    timeout=timeout
+                )
+                
+                if social_response.status_code != 200:
+                    print(f"    Failed for social factors")
+                    social_content = "ERROR"
+                else:
+                    social_content = social_response.json()['message']['content']
+                
+                # Biological factors:
+                print("    Generating improved biological factors...")
+                biological_prompt = f"""The following is an interview transcript from a psychiatric assessment of a subject who is being screened for depression. Please note that 'Ellie' is the interviewer, and 'Participant' is the subject being assessed.
+
+EVALUATION FEEDBACK:
+{chr(10).join(feedback_details)}
+
+TRANSCRIPT:
+{transcript}
+
+Summarize biological aspects that may influence the subject's mental health (ex. familial history of mental health issues, previous or pre-existing mental health issues, stress levels, etc.) addressing the feedback above.
+
+Please answer in this XML format. Use straight quotes instead of curly quotes:
+
+<assessment>Summary of biological influences on patient's health</assessment>
+<quotes>Quotes from the transcript that support the assessment</quotes>
+"""
+                
+                biological_response = requests.post(
+                    BASE_URL,
+                    json={
+                        "model": model,
+                        "messages": [{"role": "system", "content": system_prompt},
+                                   {"role": "user", "content": biological_prompt}],
+                        "stream": False,
+                        "options": {"temperature": 0, "top_k": 20, "top_p": 0.9}
+                    },
+                    timeout=timeout
+                )
+                
+                if biological_response.status_code != 200:
+                    print(f"    Failed for biological factors")
+                    biological_content = "ERROR"
+                else:
+                    biological_content = biological_response.json()['message']['content']
+                
+                # Risk factors
+                print("    Generating improved risk factors...")
+                risk_prompt = f"""The following is an interview transcript from a psychiatric assessment of a subject who is being screened for depression. Please note that 'Ellie' is the interviewer, and 'Participant' is the subject being assessed.
+
+EVALUATION FEEDBACK:
+{chr(10).join(feedback_details)}
+
+TRANSCRIPT:
+{transcript}
+
+Identify potential risk factors the subject may be experiencing, addressing the feedback above.
+
+Please answer in this XML format. Use straight quotes instead of curly quotes:
+
+<assessment>Summary of potential risk factors</assessment>
+<quotes>Exact quotes from the transcript that support the assessment</quotes>
+"""
+                
+                risk_response = requests.post(
+                    BASE_URL,
+                    json={
+                        "model": model,
+                        "messages": [{"role": "system", "content": system_prompt},
+                                   {"role": "user", "content": risk_prompt}],
+                        "stream": False,
+                        "options": {"temperature": 0, "top_k": 20, "top_p": 0.9}
+                    },
+                    timeout=timeout
+                )
+                
+                if risk_response.status_code != 200:
+                    print(f"    Failed for risk factors")
+                    risk_content = "ERROR"
+                else:
+                    risk_content = risk_response.json()['message']['content']
+                
+                # Combine all assessments into final format
+                current_assessment = f"""Overall Assessment:
+{overall_content}
+
+Social Factors:
+{social_content}
+
+Biological Factors:
+{biological_content}
+
+Risk Factors:
+{risk_content}
+"""
+                
+
                 print(f"    New assessment generated, re-evaluating only low scores: {low_scores}")
                 
-                # UPDATED: Only re-evaluate the metrics that scored low
+                # Only re-evaluate the metrics that scored low
                 new_scores = {}
                 new_explanations = {}
                 
                 for metric in low_scores:
-                    time.sleep(2)  # Rate limiting
+                    time.sleep(2)
                     
                     if metric == 'coherence':
                         new_coherence_prompt = coherence_prompt.replace(qualitative_assessment, current_assessment)
@@ -542,19 +601,19 @@ Please:
                             new_explanations['accuracy'] = content
                             print(f"      Accuracy re-evaluated: {score}")
                 
-                # Update ONLY the re-evaluated scores, keep the good ones unchanged
+                # Update ONLY the re-evaluated scores
                 for metric, score in new_scores.items():
                     if score is not None:
                         current_scores[metric] = score
                         current_explanations[metric] = new_explanations[metric]
                 
-                # Check which scores are STILL low (check all metrics, not just re-evaluated ones)
+                # Check which scores are STILL low
                 low_scores = []
                 for metric in ['coherence', 'completeness', 'specificity', 'accuracy']:
                     if current_scores.get(metric) and current_scores[metric] <= 2:
                         low_scores.append(metric)
                 
-                # Print current scores with indicators for what was re-evaluated
+                # Print current scores
                 re_eval_indicators = {metric: " (re-evaluated)" if metric in new_scores else "" 
                                     for metric in ['coherence', 'completeness', 'specificity', 'accuracy']}
                 
@@ -567,21 +626,21 @@ Please:
                 if low_scores:
                     print(f"    Still have low scores: {low_scores}, continuing with targeted feedback...")
                 else:
-                    print(f"    All scores now 4 or 5! Enhanced feedback loop complete after {iteration} iterations.")
+                    print(f"    All scores now above 2! Enhanced feedback loop complete after {iteration} iterations.")
             
             # Save final results after feedback loop completes
             if iteration >= max_iterations:
                 print(f"    Reached max iterations ({max_iterations}), stopping feedback loop")
             
-            # Save the final qualitative assessment - keeping original structure
+            # Save the final qualitative assessment
             feedback_assessment_record = {
                 'participant_id': participant_id,
-                'dataset_type': 'feedback_enhanced',  # Added dataset_type field
-                'qualitative_assessment': current_assessment  # Using the improved assessment
+                'dataset_type': 'feedback_enhanced',
+                'qualitative_assessment': current_assessment
             }
             feedback_assessments.append(feedback_assessment_record)
             
-            # Save the final evaluation scores - using simplified structure
+            # Save the final evaluation scores
             feedback_eval_record = {
                 'participant_id': participant_id,
                 'coherence': current_scores.get('coherence'),
@@ -608,13 +667,11 @@ Please:
     
     # Save progress every 10 participants
     if (len(feedback_assessments) % 10 == 0 and len(feedback_assessments) > 0) or len(feedback_assessments) == 1:
-        # Save feedback assessments
         if feedback_assessments:
             feedback_assessments_df = pd.DataFrame(feedback_assessments)
             feedback_assessments_df.to_csv(feedback_assessments_csv, index=False)
             print(f"Saved feedback assessments: {len(feedback_assessments)} records to {feedback_assessments_csv}")
         
-        # Save feedback evaluations
         if feedback_evaluations:
             feedback_evaluations_df = pd.DataFrame(feedback_evaluations)
             feedback_evaluations_df.to_csv(feedback_evaluations_csv, index=False)
@@ -640,21 +697,11 @@ if feedback_assessments:
     feedback_assessments_df = pd.DataFrame(feedback_assessments)
     feedback_assessments_df.to_csv(feedback_assessments_csv, index=False)
     print(f"Final feedback assessments saved: {feedback_assessments_csv}")
-    print(f"Feedback assessments CSV columns:")
-    print(f"- participant_id")
-    print(f"- dataset_type") 
-    print(f"- qualitative_assessment")
 
 if feedback_evaluations:
     feedback_evaluations_df = pd.DataFrame(feedback_evaluations)
     feedback_evaluations_df.to_csv(feedback_evaluations_csv, index=False)
     print(f"Final feedback evaluations saved: {feedback_evaluations_csv}")
-    print(f"Feedback evaluations CSV columns:")
-    print(f"- participant_id")
-    print(f"- coherence, coherence_explanation")
-    print(f"- completeness, completeness_explanation") 
-    print(f"- specificity, specificity_explanation")
-    print(f"- accuracy, accuracy_explanation")
 
 if not feedback_assessments and not feedback_evaluations:
     print("No participants required feedback processing, no files created.")
