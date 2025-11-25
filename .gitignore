@@ -216,3 +216,6 @@ __marimo__/
 *.err
 *.m
 *.pkl
+*.tar.gz
+*.mat
+.DS_Store
