@@ -16,6 +16,7 @@ import argparse
 import signal
 from contextlib import contextmanager
 import math
+import traceback
 
 ############################################################################################################################
 ##################### Configuring ollama, paths, and pydantic model s######################################################
@@ -75,6 +76,7 @@ def get_embedding(text, model="dengcao/Qwen3-Embedding-8B:Q8_0", dim=None):
         # Manually setting dimension because ollama doesn't natively support atm
         if dim is not None:
             # Truncate and normalize for MRL models
+            dim = int(dim)
             embedding = embedding[:dim]
             norm = math.sqrt(sum(x * x for x in embedding))
             if norm > 0:
@@ -135,46 +137,62 @@ def create_sliding_chunks(transcript_text, chunk_size=4, step_size=2):
 ######### Runs cosine similarity to pull 3 most similar transcript chunks from the reference transcripts ##################
 ############################################################################################################################
 
-def find_similar_chunks(evidence_text_embedding, participant_embedded_transcripts, top_k):
+def find_similar_chunks(query_embedding, participant_embedded_transcripts, top_k=5):
     """
-    Runs cosine similarity between the evidence and all of the reference transcript embedded chunks.
-    Then, grabs the top_k most similar ones.
-
-    Parameters
-    ----------
-    evidence_text_embedding : list
-        The embedding of the pulled evidence from the current transcript for the given PHQ8 question
-    participant_embedded_transcripts : dict
-        The dictionary with participant IDs as keys and (raw_text, embedding) as values for each transcript chunk
-    top_k : int
-        The number of most similar chunks that should be pulled (ex. top_k=3 means pull the 3 most similar chunks)
-
-    Returns
-    -------
-    list
-        List of dictionaries containing the most similar chunks, each with keys:
-        'participant_id', 'raw_text', 'similarity', and 'embedding'.
-        Sorted by similarity score in descending order.
+    Find most similar chunks to the query embedding.
+    
+    Returns list of dicts with: participant_id, chunk_id, raw_text, similarity
     """
+    
     similarities = []
     
-    # Go through all participants and their embeddings
-    for participant_id, embeddings_array in participant_embedded_transcripts.items():
-        for i, (raw_text, embedding) in enumerate(embeddings_array):
-            similarity = cosine_similarity(
-                [evidence_text_embedding], 
-                [embedding]
-            )[0][0]
+    # Convert query_embedding to 2D numpy array
+    query_embedding = np.array(query_embedding).reshape(1, -1)
+    
+    for participant_id, chunks in participant_embedded_transcripts.items():
+        # Iterate through each chunk with its index
+        for chunk_idx in range(len(chunks)):
+            # Check which column has the embedding vs text
+            col0 = chunks[chunk_idx, 0]
+            col1 = chunks[chunk_idx, 1]
+            
+            # Determine which is embedding and which is text
+            if isinstance(col0, str):
+                # Columns are reversed: text in col 0, embedding in col 1
+                raw_text = col0
+                chunk_embedding = col1
+            else:
+                # Normal order: embedding in col 0, text in col 1
+                chunk_embedding = col0
+                raw_text = col1
+            
+            # Convert chunk_embedding to 2D numpy array
+            try:
+                chunk_embedding = np.array(chunk_embedding).reshape(1, -1)
+            except Exception as e:
+                log_message(f"ERROR reshaping embedding for participant {participant_id}, chunk {chunk_idx}: {e}")
+                continue
+            
+            # Calculate cosine similarity
+            try:
+                similarity = cosine_similarity(query_embedding, chunk_embedding)[0, 0]
+            except Exception as e:
+                log_message(f"ERROR calculating similarity for participant {participant_id}, chunk {chunk_idx}: {e}")
+                continue
             
             similarities.append({
                 'participant_id': participant_id,
+                'chunk_id': chunk_idx,
                 'raw_text': raw_text,
-                'similarity': similarity,
-                'embedding': embedding
+                'similarity': similarity
             })
-    
-    # Sort by similarity and get top 3 results
+            
+    # Sort by similarity (highest first) and return top_k
     similarities.sort(key=lambda x: x['similarity'], reverse=True)
+    
+    log_message(f"DEBUG find_similar_chunks - Returning {len(similarities[:top_k])} chunks out of {len(similarities)} total")
+    for i, chunk in enumerate(similarities[:top_k]):
+        log_message(f"  Rank {i+1}: participant={chunk['participant_id']}, chunk_id={chunk['chunk_id']}, similarity={chunk['similarity']:.4f}")
     
     return similarities[:top_k]
 
@@ -230,7 +248,7 @@ def load_processed_participants(jsonl_file):
     
     return processed_ids
 
-def save_participant_result(participant_id, phq8_scores, output_file):
+def save_participant_result(participant_id, phq8_scores, reference_scores, reference_total_scores, reference_ids, output_file):
     """
     Saves a given participants prediction output to the jsonl file
 
@@ -240,17 +258,23 @@ def save_participant_result(participant_id, phq8_scores, output_file):
         The id of the given participant
 
     phq8_scores : PHQ8ScoresWithExplanations
-        Pydantic model containing PHQ-8 assessment results. Has 8 attributes 
-        (PHQ8_NoInterest, PHQ8_Depressed, PHQ8_Sleep, PHQ8_Tired, PHQ8_Appetite, 
-        PHQ8_Failure, PHQ8_Concentrating, PHQ8_Moving), each of type 
-        PHQ8ScoreWithExplanation with 'evidence', 'reason', and 'score' fields.
+        Pydantic model containing PHQ-8 assessment results.
+        
+    reference_scores : dict
+        Dictionary mapping PHQ8 questions to lists of reference evidence scores.
+    
+    reference_total_scores : dict
+        Dictionary mapping PHQ8 questions to lists of reference total PHQ8 scores.
+    
+    reference_ids : dict
+        Dictionary mapping PHQ8 questions to lists of reference evidence chunk IDs.
     
     Writes
     -------
     json
-        Record containing participant_id and timestamp. 
-        Also, predicted participants PHQ8 information for each question including:
-        "evidence", "reason", "cosine_similarity", and "score"
+        Record containing participant_id, timestamp, and predicted PHQ8 information,
+        now including "reference_evidence_scores", "reference_evidence_total_scores", 
+        and "reference_evidence_id".
     """
     result = {
         "participant_id": participant_id,
@@ -265,7 +289,10 @@ def save_participant_result(participant_id, phq8_scores, output_file):
             "evidence": score_data.evidence,
             "reason": score_data.reason,
             "cosine_similarity": getattr(score_data, 'cosine_similarity', 'N/A'),
-            "score": score_data.score
+            "score": score_data.score,
+            "reference_evidence_scores": reference_scores.get(key, []),
+            "reference_evidence_total_scores": reference_total_scores.get(key, []),
+            "reference_evidence_id": reference_ids.get(key, [])  # NEW: Add chunk IDs
         }
     
     # Append to JSONL file
@@ -396,6 +423,9 @@ def process_evidence_for_references(evidence_dict, participant_embedded_transcri
         A tuple containing:
         - str: A string with all the reference transcripts chunks and their corresponding PHQ8 scores
         - dict: Dictionary mapping PHQ8 questions to their cosine similarity scores
+        - dict: Dictionary mapping PHQ8 questions to a list of their reference evidence scores
+        - dict: Dictionary mapping PHQ8 questions to a list of their reference total PHQ8 scores
+        - dict: Dictionary mapping PHQ8 questions to a list of their reference evidence chunk IDs
     """
 
     evidence_keys = [
@@ -405,69 +435,107 @@ def process_evidence_for_references(evidence_dict, participant_embedded_transcri
     
     all_references = []
     similarity_scores = {}
+    reference_scores = {}
+    reference_total_scores = {}
+    reference_ids = {}
     
     for evidence_key in evidence_keys:
         # Get evidence texts for this key
         evidence_texts = evidence_dict.get(evidence_key, [])
         
-        # Initialize empty similarity scores for this key
+        # Initialize empty lists for this key
         similarity_scores[evidence_key] = []
+        reference_scores[evidence_key] = []
+        reference_total_scores[evidence_key] = []
+        reference_ids[evidence_key] = []
         
         # Skip if empty
         if not evidence_texts:
             continue
         
-        # Combine evidence text into single string
-        combined_text = '\n'.join(evidence_texts)
-        
-        # Skip if less than 15 characters
-        if len(combined_text) < 15:
+        if not evidence_texts or len('\n'.join(evidence_texts)) < 15:
             continue
         
         log_message(f"Processing {evidence_key}...")
         
         try:
-            # Get embedding for combined evidence text
-            evidence_embedding = get_embedding(combined_text, dim=dim)
+            log_message(f"DEBUG - examples_num type: {type(examples_num)}, value: {examples_num}")
             
-            # Find top_k similar chunks
+            top_k_value = int(examples_num)
+            log_message(f"DEBUG - Converted top_k_value: {top_k_value}, type: {type(top_k_value)}")
+            
+            evidence_embedding = get_embedding('\n'.join(evidence_texts), dim=dim)
+            log_message(f"DEBUG - About to call find_similar_chunks...")
+            
             similar_chunks = find_similar_chunks(
                 evidence_embedding, 
                 participant_embedded_transcripts, 
-                top_k=int(examples_num)
+                top_k=top_k_value
             )
             
-            # Extract similarity scores for this evidence key
+            log_message(f"DEBUG - find_similar_chunks completed successfully")
             similarity_scores[evidence_key] = [str(chunk['similarity']) for chunk in similar_chunks]
             
-            # Add each reference with its own header
             for chunk_info in similar_chunks:
                 participant_id = chunk_info['participant_id']
+                chunk_id = chunk_info.get('chunk_id', 'unknown')
                 raw_text = chunk_info['raw_text']
+
+                # Convert participant_id to match dataframe type (likely int)
+                try:
+                    participant_id_lookup = int(participant_id) if isinstance(participant_id, str) else participant_id
+                except (ValueError, TypeError):
+                    log_message(f"Could not convert participant_id {participant_id} to int")
+                    continue
                 
-                # Get the ground truth score for this participant and evidence type
                 participant_data = phq8_ground_truths.loc[
-                    phq8_ground_truths['Participant_ID'] == participant_id
+                    phq8_ground_truths['Participant_ID'] == participant_id_lookup
                 ]
                 
                 if not participant_data.empty:
+                    # Get the individual score for the specific PHQ8 question
                     score = int(participant_data[evidence_key].values[0])
+                    reference_scores[evidence_key].append(score)
+
+                    # Get the total PHQ8 score for that same participant
+                    total_score = int(participant_data['PHQ8_Score'].values[0])
+                    reference_total_scores[evidence_key].append(total_score)
+                    
+                    # Store the chunk ID
+                    reference_ids[evidence_key].append(chunk_id)
+                    
                     reference_entry = f"({evidence_key} Score: {score})\n{raw_text}"
                     all_references.append(reference_entry)
+
+                    log_message(f"\n{'='*50}")
+                    log_message(f"DEBUG - Evidence Entry Created:")
+                    log_message(f"  Key: {evidence_key}")
+                    log_message(f"  Participant ID: {participant_id}")
+                    log_message(f"  Chunk ID: {chunk_id}")
+                    log_message(f"  Individual Score: {score}")
+                    log_message(f"  Total PHQ8 Score: {total_score}")
+                    log_message(f"  Text Preview: {raw_text[:200]}...")
+                    log_message(f"  Full Reference Entry:\n{reference_entry[:300]}...")
+                    log_message(f"{'='*50}\n")
                 else:
-                    print(f"No ground truth data found for participant {participant_id}")
-                
+                    log_message(f"No ground truth data found for participant {participant_id_lookup} (original: {participant_id})")
+                                
         except Exception as e:
-            print(f"Error processing {evidence_key}: {e}")
+            log_message(f"Error processing {evidence_key}: {e}")
+            
+            traceback_str = traceback.format_exc()
+            log_message(f"Full traceback:\n{traceback_str}")
+            
             continue
-    
+
     # Combine all references into a string
     if all_references:
         reference_evidence = "<Reference Examples>\n\n" + "\n\n".join(all_references) + "\n\n<Reference Examples>"
     else:
         reference_evidence = "<Reference Examples>\nNo valid evidence found\n<Reference Examples>"
     
-    return reference_evidence, similarity_scores
+    # Return the new IDs dictionary as well
+    return reference_evidence, similarity_scores, reference_scores, reference_total_scores, reference_ids
 
 ################################################################################################################################
 ############ Running quantitative analysis, but with reference transcripts this time. Grabs evidence, reasons, and outputs score
@@ -700,10 +768,10 @@ if __name__ == "__main__":
     # Ollama Config
     OLLAMA_NODE = args.ollama_node
     BASE_URL = f"http://{OLLAMA_NODE}:11434/api/chat"
-    model = "gemma3-optimized:27b" #gpt-oss:20b
+    model = "gemma3-optimized:27b" # alibayram/medgemma:27b
 
     # Output paths
-    OUTPUT_DIR = r"/data/users2/agreene46/ai-psychiatrist/analysis_output"
+    OUTPUT_DIR = r"/data/users2/agreene46/ai-psychiatrist/new_jsonl_analysis_output"
     LOG_FILE = os.path.join(OUTPUT_DIR, "embedding_log_file.txt")
     
     # Ensure output directory exists
@@ -881,6 +949,8 @@ if __name__ == "__main__":
                 raise
                 
             for examples_num in examples_nums:
+                # to int
+                examples_num = int(examples_num) if isinstance(examples_num, str) else examples_num
                 for run_num in range(1, args.num_runs + 1):
                     combination_num += 1
                     
@@ -890,9 +960,9 @@ if __name__ == "__main__":
                     log_message(f"chunk_step: {chunk_step}, dim: {dim if dim else 'default'}, examples_num: {examples_num}, run: {run_num}")  # Fix: add dim
                     log_message("="*80)
                     if dim:
-                        JSONL_FILE = os.path.join(OUTPUT_DIR, f"{chunk_step}_dim_{dim}_examples_{examples_num}_embedding_results_analysis_{run_num}.jsonl")
+                        JSONL_FILE = os.path.join(OUTPUT_DIR, f"ids_{chunk_step}_dim_{dim}_examples_{examples_num}_embedding_results_analysis_{run_num}.jsonl")
                     else:
-                        JSONL_FILE = os.path.join(OUTPUT_DIR, f"{chunk_step}_examples_{examples_num}_embedding_results_analysis_{run_num}.jsonl")
+                        JSONL_FILE = os.path.join(OUTPUT_DIR, f"ids_{chunk_step}_examples_{examples_num}_embedding_results_analysis_{run_num}.jsonl")
                     log_message(f"Output file: {JSONL_FILE}")
                     log_message(f"Total participants to process: {len(val_ids)}")
                     
@@ -902,7 +972,7 @@ if __name__ == "__main__":
                     # Process each participant with retry logic
                     successful = 0
                     failed = 0
-                    
+
                     # Runs analysis for each participant in the given set, change 'test_ids' to 'val_ids' to run validation
                     for idx, participant_id in enumerate(test_ids):
                         # Skip if already processed for this combination
@@ -944,7 +1014,7 @@ if __name__ == "__main__":
                                     
                                     # Generate reference evidence (excluding current participant from embeddings)
                                     reference_embeddings = {k: v for k, v in participant_embedded_transcripts.items() if k != participant_id}
-                                    reference_evidence, similarity_scores = process_evidence_for_references(
+                                    reference_evidence, similarity_scores, reference_scores, reference_total_scores, reference_ids = process_evidence_for_references(
                                         evidence_dict, 
                                         reference_embeddings, 
                                         phq8_ground_truths,
@@ -957,10 +1027,17 @@ if __name__ == "__main__":
                                         reference_evidence,
                                         similarity_scores 
                                     )
-                                    
+
                                     # Save results to the combination-specific file
-                                    save_participant_result(participant_id, phq8_scores, output_file=JSONL_FILE)
-                                    
+                                    save_participant_result(
+                                        participant_id, 
+                                        phq8_scores, 
+                                        reference_scores, 
+                                        reference_total_scores,
+                                        reference_ids, 
+                                        output_file=JSONL_FILE
+                                    )
+
                                     successful += 1
                                     participant_processed = True
                                     log_message(f"[{chunk_step}, {examples_num}, run {run_num}] Successfully processed participant {participant_id} (attempt {retry_count})", print_to_console=False)

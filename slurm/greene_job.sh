@@ -2,7 +2,7 @@
 #SBATCH -J ollama
 #SBATCH -p qTRDGPU
 #SBATCH -A trends53c17
-#SBATCH -t 15:15:00
+#SBATCH -t 24:15:00
 #SBATCH -c 24
 #SBATCH --mem=50g
 #SBATCH --gres=gpu:A40:2
