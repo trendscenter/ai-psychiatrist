@@ -23,9 +23,8 @@ class MetaReviewerAgent:
                 <quantitative_assessment>\n{quantitative}</quantitative_assessment>
 
                 According to the Patient Health Questionnaire eight-item depression scale (PHQ-8), a total PHQ-8 score of 0 to 4 represents no significant depressive symptoms; a total score of 5 to 9 represents mild depressive symptoms; 10 to 14, moderate; 15 to 19, moderately severe; and 20 to 24, severe. \
-                Note that the interview might not discuss all eight PHQ-8 items, so please try your best to predict the participant's condition based on the available information. \
-                Given the interview transcript and assessments above, please predict a binary diagnosis label in <diagnosis> tags where 0 means that the participant has no depressive symptoms and 1 means that the participant has depressive symptoms. \
-                Please also predict their severity level in <severity> tags, where 0 means no significant depressive symptoms, 1 means mild symptoms, 2 means moderate symptoms, 3 means moderately severe symptoms, and 4 means severe symptoms. \
+                Note that the interview may not cover all eight PHQ-8 items. Therefore, directly summing the available scores and deriving a severity level could underestimate the participant's condition. Please use the available information to infer and predict the participant's condition as accurately as possible. \
+                Please predict their severity level in <severity> tags, where 0 means no significant depressive symptoms, 1 means mild symptoms, 2 means moderate symptoms, 3 means moderately severe symptoms, and 4 means severe symptoms. \
                 Please explain your predictions in <explanation> tags. Please provide answers in the XML format with each tag on a new line.
                 '''
         response = self.client.chat(
