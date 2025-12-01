@@ -1,7 +1,7 @@
 import requests
 import json
 
-class QuantitativeAssessor:
+class QuantitativeAssessorZ:
     def __init__(self, model="llama3"):
         self.model = model
 
@@ -23,7 +23,6 @@ class QuantitativeAssessor:
         6. When reference examples are provided, use them for cross-analysis to inform scoring decisions
         7. Weight reference examples based on their similarity to the current evidence - highly similar references should be considered more heavily
         8. Follow the format specified exactly
-        
         Analyze the following interview transcript and predict PHQ-8 scores for each symptom domain.
 
         Interview transcript:
@@ -56,13 +55,9 @@ class QuantitativeAssessor:
         - "PHQ8_Concentrating": {{evidence, reason, score}} for trouble concentrating on things like reading or watching TV (concentration problems)
         - "PHQ8_Moving": {{evidence, reason, score}} for moving or speaking slowly, or being fidgety/restless (psychomotor changes)"""
 
-
         response = requests.post(
             "http://localhost:11434/api/generate",
-            json={
-                "model": self.model,
-                "prompt": prompt.strip()
-            },
+            json={"model": self.model, "prompt": prompt.strip()},
             stream=True
         )
 
@@ -71,7 +66,7 @@ class QuantitativeAssessor:
             if line:
                 chunk = line.decode("utf-8")
                 data = json.loads(chunk)
-                piece = data.get("response", "")
-                full_response += piece
+                full_response += data.get("response", "")
 
         return full_response
+

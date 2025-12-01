@@ -1,55 +1,69 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+# server.py
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+
 from agents.interview_simulator import InterviewSimulator
 from agents.interview_evaluator import InterviewEvaluatorAgent
-from agents.quantitative_assessor import QuantitativeAssessor
-from agents.qualitative_assessor import QualitativeAssessor
+from agents.quantitative_assessor_f import QuantitativeAssessor as QuantitativeAssessorF
+from agents.qualitative_assessor_f import QualitativeAssessor
 from agents.meta_reviewer import MetaReviewerAgent
 from agents.qualitive_evaluator import QualitativeEvaluatorAgent
+from agents.quantitative_assessor_z import QuantitativeAssessorZ
 
-app = FastAPI()
+app = FastAPI(title="AI Psychiatrist Pipeline", version="1.2.0")
 
-# Initialize all agents
-interview_agent = InterviewSimulator()
+# --- Shared agents ---
+interview_loader = InterviewSimulator()  # reads fixed file only
 interview_evaluator = InterviewEvaluatorAgent()
-quantitative_assessor = QuantitativeAssessor()
-meta_reviewer = MetaReviewerAgent()
 qualitative_assessor = QualitativeAssessor()
 qualitative_evaluator = QualitativeEvaluatorAgent()
+meta_reviewer = MetaReviewerAgent()
 
-# Request schema (mode=0 for zero-shot, mode=1 for few-shot)
+# --- Quantitative variants ---
+quantitative_assessor_F = QuantitativeAssessorF()  # few-shot
+quantitative_assessor_Z = QuantitativeAssessorZ()  # zero-shot
+
 class InterviewRequest(BaseModel):
-    mode: int = 0
+    mode: int = Field(0, ge=0, le=1, description="0=zero-shot (Z), 1=few-shot (F) for quantitative assessor ONLY")
 
 @app.post("/full_pipeline")
 def run_full_pipeline(request: InterviewRequest):
-    # 1. Simulate interview on depression
-    conversation = interview_agent.simulate(mode=request.mode)
+    # 0) Always load the fixed transcript (no user-provided text/path)
+    try:
+        conversation = interview_loader.load()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Transcript load error: {e}")
 
-    # 2. Evaluate conversation qualitatively
-    interview_evaluation = interview_evaluator.assess(conversation)
+    # 1) Pick quantitative assessor by mode
+    if request.mode == 0:
+        quantitative_assessor = quantitative_assessor_Z
+        quantitative_variant = "Z"
+    else:
+        quantitative_assessor = quantitative_assessor_F
+        quantitative_variant = "F"
 
-    # 3. Quantitative PHQ scoring
+    # 2) Quantitative PHQ scoring
     quantitative_result = quantitative_assessor.assess(conversation)
 
-    # 3. qualitative scoring
+    # 3) Qualitative scoring
     qualitative_result = qualitative_assessor.assess(conversation)
 
-    qualitative_evaluation = qualitative_evaluator.assess(qualitative_result)
+    # 4) Qualitative evaluation
+    qualitative_evaluation = qualitative_evaluator.assess(conversation, qualitative_result)
 
-    # 4. Meta-review aggregates all agent outputs
+    # 5) Meta review
     final_review = meta_reviewer.review(
         interview=conversation,
         quantitative=quantitative_result,
         qualitative=qualitative_result
-
     )
 
     return {
+        "mode": request.mode,
+        "quantitative_variant": quantitative_variant,
         "conversation": conversation,
-        "interview_evaluation": interview_evaluation,
-        'qualitative_result': qualitative_result,
-        "quantitative_score": quantitative_result,
+        "qualitative_result": qualitative_result,
         "quantitative_evaluation": qualitative_evaluation,
+        "quantitative_score": quantitative_result,
         "meta_review": final_review
     }
