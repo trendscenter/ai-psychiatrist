@@ -1,6 +1,8 @@
-# AI Psychiatrist Assistant
+# AI Psychiatrist Assistant: An LLM-based Multi-Agent System for Depression Assessment from Clinical Interviews
 
-An AI psychiatrist assistant for measuring depression symptoms from clinical interview transcripts
+<p align="center">
+<img src=assets/overview.png />
+</p>
 
 ## Environment Setup
 
@@ -43,20 +45,24 @@ sbatch job_assess.sh
 
 4. If you stop using Ollama, you can stop the job using the command `scancel <job_id>`, where `<job_id>` is the job ID of the Ollama job. You can find the job ID in the output of the command `squeue -u <username>`.
 
-## Analysis
+## Code
 
-- [qualitative_assessment](qualitative_assessment) contains scripts for identifying social and biological risk factors.
+- [qualitative_assessment](qualitative_assessment) contains the scripts for identifying social and biological risk factors.
 
-- [quantitative_assessment](quantitative_assessment) contains scripts for predicting PHQ-8 scores.
+- [quantitative_assessment](quantitative_assessment) contains the scripts for predicting PHQ-8 scores.
 
-- [visualization](visualization) contains scripts for generating figures.
+- [meta_review](meta_review) contains the code for integrating information and predicting severity.
+
+- [agents](agents) contains the code for the multi-agent system.
+
+- [analysis_output](analysis_output) contains the outputs from the quantitative assessment.
+
+- [visualization](visualization) contains the scripts for generating the figures.
 
 ## References
+
+- [OpenReview paper](https://openreview.net/forum?id=mV0xJpO7A0)
 
 - [Ollama documentation](https://github.com/ollama/ollama)
 
 - [TReNDS cluster documentation](https://trendscenter.github.io/wiki)
-
-## Contributors
-
-Adam Greene, Neviah Blair, Xinhui Li
