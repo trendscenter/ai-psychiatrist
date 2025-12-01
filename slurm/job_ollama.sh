@@ -1,15 +1,14 @@
 #!/bin/bash
 #SBATCH -J ollama
-#SBATCH -p qTRDGPU
+#SBATCH -p qTRDGPUH
+#SBATCH --gres=gpu:A100:2
 #SBATCH -A trends53c17
-#SBATCH -t 24:15:00
+#SBATCH -t 00:30:00
 #SBATCH -c 24
-#SBATCH --mem=50g
-#SBATCH --gres=gpu:A40:2
-#SBATCH -e err%A-%a.err
-#SBATCH -o out%A-%a.out
+#SBATCH --mem=100g
+#SBATCH -e ./err/err%A-%a.err
+#SBATCH -o ./out/out%A-%a.out
 
-# To recognize ollama
 export PATH=/trdapps/linux-x86_64/bin/:$PATH
 
 # Ensure both GPUs are visible to Ollama
