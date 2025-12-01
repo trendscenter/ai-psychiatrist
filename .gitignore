@@ -209,7 +209,6 @@ __marimo__/
 # Other files
 *.pdf
 *.txt
-*.csv
 *.wav
 *.bin
 *.out
