@@ -10,20 +10,21 @@ import time
 
 OLLAMA_NODE = "arctrddgxa003" # TODO: Change this variable to the node where Ollama is running
 BASE_URL = f"http://{OLLAMA_NODE}:11434/api/chat"
-model = "alibayram/medgemma:27b" # TODO: Change this variable to the model you want to use
+model = "gemma3:27b" # TODO: Change this variable to the model you want to use
 
-id_train =  [429, 430, 433, 434, 437, 441, 443, 444, 445, 446, 447, 448, 449, 454, 455, 456, 457, 459, 463, 464, 468, 471, 473, 474, 475, 478, 479, 485, 486, 487, 488, 491, 302, 307, 331, 335, 346, 367, 377, 381, 382, 403, 404, 406, 413, 417, 418, 420, 422, 436, 439, 440, 451, 458, 472, 476, 477, 482, 483, 484, 489, 490
-]
-id_dev = [492
-]
+train_path = pd.read_csv("/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/train_split_Depression_AVEC2017.csv")
+dev_path = pd.read_csv("/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/dev_split_Depression_AVEC2017.csv")
 
-print(f"Number of train subjects: {len(id_train)}")
-print(f"Number of dev subjects: {len(id_dev)}")
-print("First 3 train subjects:", id_train[:3] if len(id_train) >= 3 else id_train)
-print("First 3 dev subjects:", id_dev[:3] if len(id_dev) >= 3 else id_dev)
+test_path = pd.read_csv("/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/test_split_Depression_AVEC2017.csv")
 
-all_subjects = [(subj, 'train') for subj in id_train] + [(subj, 'dev') for subj in id_dev]
+#id_train = train_path.iloc[:, 0].tolist()
+#id_dev = dev_path.iloc[:, 0].tolist()
 
+id_test = test_path.iloc[:, 0].tolist()
+
+#all_subjects = [(subj, 'train') for subj in id_train] + [(subj, 'dev') for subj in id_dev]
+
+all_subjects = [(subj, 'test') for subj in id_test]
 print(f"Total subjects to process: {len(all_subjects)}")
 
 # PHQ-8 symptoms list
@@ -48,7 +49,7 @@ for i, (participant_id, dataset_type) in enumerate(all_subjects):
     
     start_time = time.time()
     
-    id_transcript = os.path.join("/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/", f"{participant_id}_P", f"{participant_id}_TRANSCRIPT.csv")
+    id_transcript = os.path.join("/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/", f"{participant_id}_P", f"{participant_id}_TRANSCRIPT.csv")
     
     print(f"Looking for transcript at: {id_transcript}")
     
@@ -87,6 +88,9 @@ Please answer in this XML format. Use straight quotes instead of curly quotes, a
 <assessment>Summary of participant's overall mental health</assessment>
 <quotes>Exact quotes from the transcript that support the assessment</quotes>
 """
+        
+        # Start timing
+        start_time = time.time()
         
         response = requests.post(
             BASE_URL,
@@ -342,14 +346,15 @@ print(f"Skipped (no transcript): {skipped_count}")
 print(f"Results collected: {len(results)}")
 
 if results:
+    # Save main results file
     resultsdf = pd.DataFrame(results)
-    output_file = "/home/users/nblair7/ai-psychiatrist/qualitative_assessment/MG142ipy2.csv"
+    output_file = "/data/users2/user/new_analysis_results/TESTSUBJECTS.csv"
     resultsdf.to_csv(output_file, index=False)
     print(f"Saved results to: {output_file}")
 
 if runtime_results:
     runtime_df = pd.DataFrame(runtime_results)
-    runtime_output_file = "/home/users/nblair7/ai-psychiatrist/qualitative_assessment/MG142ipyrun2.csv"
+    runtime_output_file = "/home/users/user/ai-psychiatrist/runtime_results.csv"
     runtime_df.to_csv(runtime_output_file, index=False)
     print(f"Saved runtime results to: {runtime_output_file}")
 else:

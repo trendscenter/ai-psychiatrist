@@ -8,7 +8,7 @@ import csv
 from datetime import datetime
 
 # Ollama Config
-OLLAMA_NODE = "arctrdagn032"
+OLLAMA_NODE = "arctrddgxa004"
 BASE_URL = f"http://{OLLAMA_NODE}:11434/api/chat"
 
 model = "gemma3-optimized:27b" # qwq:latest
@@ -17,8 +17,8 @@ model = "gemma3-optimized:27b" # qwq:latest
 # Grabbing all participant IDs that have all the PHQ-8 questionare data #####################################################
 #############################################################################################################################
 
-dev_split_phq8 = pd.read_csv(r"/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/dev_split_Depression_AVEC2017.csv")
-train_split_phq8 = pd.read_csv(r"/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/train_split_Depression_AVEC2017.csv")
+dev_split_phq8 = pd.read_csv(r"/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/dev_split_Depression_AVEC2017.csv")
+train_split_phq8 = pd.read_csv(r"/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/train_split_Depression_AVEC2017.csv")
 
 participant_ids = set()
 
@@ -252,8 +252,8 @@ Return ONLY a JSON object in <answer> tags with these exact keys:
 if __name__ == "__main__":
 
     # Specify output path
-    csv_file = f"/data/users2/agreene46/ai-psychiatrist/analysis_output/results.csv"
-    json_file = f"/data/users2/agreene46/ai-psychiatrist/analysis_output/results_detailed.jsonl"
+    csv_file = f"/data/users2/user/ai-psychiatrist/analysis_output/results.csv"
+    json_file = f"/data/users2/user/ai-psychiatrist/analysis_output/results_detailed.jsonl"
 
     # Initialize CSV file with headers
     with open(csv_file, 'w', newline='') as f:
@@ -264,7 +264,7 @@ if __name__ == "__main__":
 
     # Execution loop
     for participant_id in participant_list:
-        current_transcript = pd.read_csv(fr"/data/users4/xli/ai-psychiatrist/datasets/daic_woz_dataset/{participant_id}_P/{participant_id}_TRANSCRIPT.csv", sep="\t")
+        current_transcript = pd.read_csv(fr"/data/users4/user/ai-psychiatrist/datasets/daic_woz_dataset/{participant_id}_P/{participant_id}_TRANSCRIPT.csv", sep="\t")
         
         # Reformatting transcript data to be a string with speaker name + text
         current_patient_transcript = '\n'.join(current_transcript['speaker'].astype(str) + ': ' + current_transcript['value'].astype(str))        

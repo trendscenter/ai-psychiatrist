@@ -218,4 +218,4 @@ __marimo__/
 *.pkl
 *.tar.gz
 *.mat
-*.DS_Store
+.DS_Store
