@@ -2,7 +2,7 @@ import requests
 import json
 
 class QualitativeAssessor:
-    def __init__(self, model="llama3"):
+    def __init__(self, model="alibayram/medgemma:latest"):
         self.model = model
 
     def assess(self, interview_text: str):

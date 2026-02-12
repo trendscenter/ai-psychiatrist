@@ -25,17 +25,17 @@ PHQ8_KEYS = [
     "PHQ8_Appetite","PHQ8_Failure","PHQ8_Concentrating","PHQ8_Moving"
 ]
 
-# ----------------------------- Keyword fallback -----------------------------
-DOMAIN_KEYWORDS = {
-    "PHQ8_NoInterest": ["can't be bothered", "no interest", "nothing really", "not enjoy", "no pleasure", "what's the point", "can’t be bothered", "cant be bothered"],
-    "PHQ8_Depressed": ["fed up", "miserable", "depressed", "very black", "hopeless", "low"],
-    "PHQ8_Sleep": ["sleep", "fall asleep", "wake up", "insomnia", "clock", "tired in the morning"],
-    "PHQ8_Tired": ["exhausted", "tired", "little energy", "fatigue", "no energy"],
-    "PHQ8_Appetite": ["appetite", "weight", "lost weight", "eat", "eating", "don’t bother", "dont bother", "looser"],
-    "PHQ8_Failure": ["useless", "failure", "bad about myself", "burden"],
-    "PHQ8_Concentrating": ["concentrat", "memory", "forgot", "thinking of something else", "focus"],
-    "PHQ8_Moving": ["moving slowly", "restless", "fidget", "speaking slowly", "psychomotor"]
-}
+# # ----------------------------- Keyword fallback -----------------------------
+# DOMAIN_KEYWORDS = {
+#     "PHQ8_NoInterest": ["can't be bothered", "no interest", "nothing really", "not enjoy", "no pleasure", "what's the point", "can’t be bothered", "cant be bothered"],
+#     "PHQ8_Depressed": ["fed up", "miserable", "depressed", "very black", "hopeless", "low"],
+#     "PHQ8_Sleep": ["sleep", "fall asleep", "wake up", "insomnia", "clock", "tired in the morning"],
+#     "PHQ8_Tired": ["exhausted", "tired", "little energy", "fatigue", "no energy"],
+#     "PHQ8_Appetite": ["appetite", "weight", "lost weight", "eat", "eating", "don’t bother", "dont bother", "looser"],
+#     "PHQ8_Failure": ["useless", "failure", "bad about myself", "burden"],
+#     "PHQ8_Concentrating": ["concentrat", "memory", "forgot", "thinking of something else", "focus"],
+#     "PHQ8_Moving": ["moving slowly", "restless", "fidget", "speaking slowly", "psychomotor"]
+# }
 
 def _empty_item(reason: str) -> Dict[str, Any]:
     return {"evidence": "No relevant evidence found", "reason": reason, "score": "N/A"}
@@ -81,25 +81,25 @@ def _sentences(txt: str) -> List[str]:
     parts = re.split(r'(?<=[\.\?\!])\s+|\n+', txt.strip())
     return [p.strip(" \t-") for p in parts if p and len(p.strip()) > 0]
 
-def _keyword_backfill(transcript: str, current: Dict[str, List[str]], per_item_cap: int = 3) -> Dict[str, List[str]]:
-    sents = _sentences(transcript.lower())
-    orig_sents = _sentences(transcript)
-    out = {k: list(v) for k, v in current.items()}
-    for key, kws in DOMAIN_KEYWORDS.items():
-        need = max(0, per_item_cap - len(out.get(key, [])))
-        if need == 0:
-            continue
-        hits = []
-        for idx, s in enumerate(sents):
-            if any(kw in s for kw in kws):
-                hits.append(orig_sents[idx].strip())
-            if len(hits) >= need:
-                break
-        if hits:
-            seen = set(out.get(key, []))
-            merged = out.get(key, []) + [h for h in hits if h not in seen]
-            out[key] = merged[:per_item_cap]
-    return out
+# def _keyword_backfill(transcript: str, current: Dict[str, List[str]], per_item_cap: int = 3) -> Dict[str, List[str]]:
+#     sents = _sentences(transcript.lower())
+#     orig_sents = _sentences(transcript)
+#     out = {k: list(v) for k, v in current.items()}
+#     for key, kws in DOMAIN_KEYWORDS.items():
+#         need = max(0, per_item_cap - len(out.get(key, [])))
+#         if need == 0:
+#             continue
+#         hits = []
+#         for idx, s in enumerate(sents):
+#             if any(kw in s for kw in kws):
+#                 hits.append(orig_sents[idx].strip())
+#             if len(hits) >= need:
+#                 break
+#         if hits:
+#             seen = set(out.get(key, []))
+#             merged = out.get(key, []) + [h for h in hits if h not in seen]
+#             out[key] = merged[:per_item_cap]
+#     return out
 
 # ----------------------------- Utils -----------------------------
 def _now() -> str:
@@ -207,19 +207,97 @@ def ollama_chat(host: str, model: str, system_prompt: str, user_prompt: str, tim
     _log("[CHAT] Raw model output (first 800 chars):\n" + content[:800])
     return content
 
+# def ollama_embed(host: str, model: str, text: str, dim: Optional[int] = None, timeout=120) -> List[float]:
+#     import requests, math
+#
+#     url = f"http://{host}:11434/api/embeddings"
+#     headers = {"Content-Type": "application/json"}
+#
+#     def _post(payload):
+#         r = requests.post(url, json=payload, headers=headers, timeout=timeout)
+#         r.raise_for_status()
+#         return r.json()
+#
+#     # ---- 1️⃣  امتحان API جدید با "input"
+#     data = _post({"model": model, "input": text})
+#
+#     # ---- 2️⃣  اگر خالی یا بی‌پاسخ بود، امتحان با آرایه
+#     if not data.get("embedding") and not data.get("embeddings"):
+#         data = _post({"model": model, "input": [text]})
+#
+#     # ---- 3️⃣  اگر هنوز خالی بود، برگرد به روش قدیمی با "prompt"
+#     if not data.get("embedding") and not data.get("embeddings"):
+#         data = _post({"model": model, "prompt": text})
+#
+#     # ---- بررسی خطا و خروجی نهایی
+#     if "error" in data:
+#         raise RuntimeError(f"Ollama embeddings error: {data['error']} (model={model})")
+#
+#     if isinstance(data.get("embedding"), list):
+#         emb = data["embedding"]
+#     elif isinstance(data.get("embeddings"), list) and data["embeddings"]:
+#         emb = data["embeddings"][0]
+#     else:
+#         raise RuntimeError(f"Empty or invalid embedding response: {data}")
+#
+#     # ---- نرمال‌سازی و بُرش بعدی
+#     if dim is not None:
+#         emb = emb[:dim]
+#
+#     n = math.sqrt(sum(x * x for x in emb))
+#     if n > 0:
+#         emb = [x / n for x in emb]
+#
+#     _log(f"[EMB] host={host} model={model} dim={len(emb)} text_len={len(text)}")
+#     return emb
+
 def ollama_embed(host: str, model: str, text: str, dim: Optional[int] = None, timeout=120) -> List[float]:
-    url = f"http://{host}:11434/api/embeddings"
-    r = requests.post(url, json={"model": model, "prompt": text}, timeout=timeout)
-    r.raise_for_status()
-    emb = r.json()["embedding"]
+    import requests, math
+
+    # Trying both common endpoints for maximum compatibility
+    endpoints = ["/api/embed", "/api/embeddings"]
+    data = None
+
+    for endpoint in endpoints:
+        url = f"http://{host}:11434{endpoint}"
+        try:
+            # Standard payload for modern Ollama versions
+            payload = {"model": model, "input": text}
+            r = requests.post(url, json=payload, timeout=timeout)
+
+            if r.status_code == 200:
+                data = r.json()
+                break
+        except Exception:
+            continue
+
+    if not data or "error" in data:
+        error_msg = data.get("error") if data else "No response"
+        raise RuntimeError(f"Ollama embeddings error: {error_msg} (model={model})")
+
+    # Correctly extracting the vector based on the endpoint's response format
+    emb = None
+    if isinstance(data.get("embedding"), list):
+        emb = data["embedding"]
+    elif isinstance(data.get("embeddings"), list) and data["embeddings"]:
+        # /api/embed returns a list of lists, take the first one
+        emb = data["embeddings"][0]
+
+    if not emb:
+        raise RuntimeError(f"Empty or invalid embedding response: {data}")
+
+    # Keep your original logic for dimensions and normalization
     if dim is not None:
         emb = emb[:dim]
+
+    # L2 Normalization (keep this for consistent similarity scoring in PHQ-8)
     n = math.sqrt(sum(x * x for x in emb))
     if n > 0:
         emb = [x / n for x in emb]
+
     _log(f"[EMB] host={host} model={model} dim={len(emb)} text_len={len(text)}")
     return emb
-
+#
 # ----------------------------- Prompts (filled) -----------------------------
 quantitative_prompt = f"""You are a AI psychiatrist assessment tool specialized in analyzing interview transcripts to evaluate PHQ-8 (Patient Health Questionnaire-8) scores. The PHQ-8 is a validated depression screening instrument that assesses eight of the nine DSM-IV criteria for depressive disorders over the past 2 weeks.
 
@@ -416,7 +494,7 @@ class QuantitativeAssessor:
     def __init__(
         self,
         ollama_host: str = "127.0.0.1",
-        chat_model: str = "llama3",
+        chat_model: str = "alibayram/medgemma:latest",
         emb_model: str  = "dengcao/Qwen3-Embedding-8B:Q4_K_M",
         pickle_path: str = "agents/chunk_8_step_2_participant_embedded_transcripts.pkl",
         gt_train_csv: str = "agents/train_split_Depression_AVEC2017.csv",
@@ -453,32 +531,69 @@ class QuantitativeAssessor:
         self.participant_embedded_transcripts = pet
 
     def extract_evidence(self, transcript: str) -> Dict[str, List[str]]:
-        user_prompt = EVIDENCE_EXTRACT_PROMPT.replace("{transcript}", transcript)
-        _log("[STEP] Evidence extraction prompt (exact):")
-        _log(user_prompt)
-        raw = ollama_chat(self.ollama_host, self.chat_model, system_prompt="", user_prompt=user_prompt)
-        try:
-            txt = _strip_json_block(raw)
-            obj = json.loads(txt)
-        except Exception as e:
-            _log(f"[WARN] Evidence JSON parse failed: {e}")
-            obj = {}
-        out = {}
-        for k in PHQ8_KEYS:
-            arr = obj.get(k, []) if isinstance(obj, dict) else []
-            if not isinstance(arr, list):
-                arr = []
-            seen, uniq = set(), []
-            for q in arr:
-                qs = str(q).strip()
-                if qs and qs not in seen:
-                    seen.add(qs)
-                    uniq.append(qs)
-            out[k] = uniq
-        enriched = _keyword_backfill(transcript, out, per_item_cap=3)
-        _log("[STEP] Evidence dict (with keyword backfill):")
-        _log(json.dumps(enriched, ensure_ascii=False, indent=2))
-        return enriched
+        _log("[STEP] Starting semantic LLM evidence extraction...")
+
+        # 1. Split transcript into sentences
+        sentences = _sentences(transcript)
+
+        # 2. Group into chunks (5 sentences provide enough context)
+        chunks = [" ".join(sentences[i: i + 5]) for i in range(0, len(sentences), 5)]
+
+        all_extracted_evidence = {k: [] for k in PHQ8_KEYS}
+
+        # 3. New Prompt for semantic scanning
+        semantic_scan_prompt = """
+        Analyze the following transcript segment as a clinical expert.
+        Find any quotes or descriptions related to these PHQ-8 domains: {symptoms}.
+
+        Segment: "{segment}"
+
+        Return ONLY a JSON object. If no evidence is found, return an empty list [].
+        Format: {{"PHQ8_Depressed": ["quote1"], "PHQ8_Sleep": []}}
+        """
+
+        symptoms_str = ", ".join(PHQ8_KEYS)
+
+        for i, segment in enumerate(chunks):
+            _log(f"Scanning segment {i + 1}/{len(chunks)}...")
+
+            user_prompt = semantic_scan_prompt.format(
+                symptoms=symptoms_str,
+                segment=segment
+            )
+
+            try:
+                # Call Ollama for each chunk
+                raw_response = ollama_chat(
+                    self.ollama_host,
+                    self.chat_model,
+                    "You are a clinical evidence extractor. Output only JSON.",
+                    user_prompt
+                )
+
+                cleaned_json = _strip_json_block(raw_response)
+                segment_data = json.loads(cleaned_json)
+                print(f'found segments : {segment_data}')
+
+                # Safety check: convert empty list to dictionary to avoid attribute errors
+                if isinstance(segment_data, list):
+                    segment_data = {}
+
+                # 4. Aggregate results
+                for key in PHQ8_KEYS:
+                    quotes = segment_data.get(key, [])
+                    if isinstance(quotes, list):
+                        for q in quotes:
+                            q_clean = q.strip()
+                            if q_clean and q_clean not in all_extracted_evidence[key]:
+                                all_extracted_evidence[key].append(q_clean)
+
+            except Exception as e:
+                _log(f"[WARN] Failed segment {i + 1}: {e}")
+                continue
+
+        _log("[STEP] Semantic extraction complete.")
+        return all_extracted_evidence
 
     def build_reference_bundle(self, evidence_dict: Dict[str, List[str]]) -> Tuple[str, Dict[str, List[str]]]:
         blocks = []
@@ -545,7 +660,7 @@ class QuantitativeAssessor:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--ollama_host", default="127.0.0.1")
-    parser.add_argument("--chat_model", default="llama3")
+    parser.add_argument("--chat_model", default="alibayram/medgemma:latest")
     parser.add_argument("--emb_model",  default="dengcao/Qwen3-Embedding-8B:Q4_K_M")
     parser.add_argument("--pickle_path", default="chunk_8_step_2_participant_embedded_transcripts.pkl")
     parser.add_argument("--gt_train_csv", default="train_split_Depression_AVEC2017.csv")
@@ -780,4 +895,4 @@ Would that be alright with you?
 - I need to do this, yes; I think that’s sensible yeah. - Ok
     """
     out = qa.assess(demo)
-    print(json.dumps(out, ensure_ascii=False, indent=2))
+    # print(json.dumps(out, ensure_ascii=False, indent=2))

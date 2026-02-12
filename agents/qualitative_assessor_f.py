@@ -2,9 +2,8 @@ import requests
 import json
 
 class QualitativeAssessor:
-    def __init__(self, model="llama3"):
+    def __init__(self, model="alibayram/medgemma:latest"):
         self.model = model
-
     def assess(self, interview_text: str):
         prompt = f"""
             You are a psychiatrist. Your job is to assess and diagnose patients for depression. Be as objective, concise, and accurate as possible. Be specific and avoid vague generalities. Use exact quotes from the transcript to support your assessment for each tag.

@@ -3,7 +3,7 @@ import json
 import re
 
 class InterviewEvaluatorAgent:
-    def __init__(self, model="llama3"):
+    def __init__(self, model="alibayram/medgemma:latest"):
         self.model = model
         self.endpoint = "http://localhost:11434/api/generate"
 

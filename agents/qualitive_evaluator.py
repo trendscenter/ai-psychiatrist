@@ -28,7 +28,7 @@ def parse_score_and_explanation(response_text):
 
 
 class QualitativeEvaluatorAgent:
-    def __init__(self, model="llama3", endpoint="http://localhost:11434/api/chat"):
+    def __init__(self, model="alibayram/medgemma:latest", endpoint="http://localhost:11434/api/chat"):
         self.model = model
         self.endpoint = endpoint
 
