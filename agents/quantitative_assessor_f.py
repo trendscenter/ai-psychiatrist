@@ -105,10 +105,21 @@ def _sentences(txt: str) -> List[str]:
 def _now() -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S")
 
+# def _log(msg: str):
+#     if VERBOSE:
+#         print(f"[{_now()}] {msg}")
+
 def _log(msg: str):
     if VERBOSE:
         print(f"[{_now()}] {msg}")
 
+def _log_header(title: str):
+    print("\n" + "="*60)
+    print(f" >>> {title.upper()} <<< ")
+    print("="*60 + "\n")
+
+def _log_substep(name: str, detail: str = ""):
+    print(f"  [➔] {name}: {detail}")
 def _l2norm(v: np.ndarray) -> np.ndarray:
     n = np.linalg.norm(v)
     return v / n if n > 0 else v
@@ -131,9 +142,22 @@ def _strip_json_block(s: str) -> str:
     t = re.sub(r",\s*([}\]])", r"\1", t)
     return t
 
+
 def _tolerant_fixups(s: str) -> str:
+    # 1. Standardize quotes
     s = s.replace("“", '"').replace("”", '"').replace("’", "'").replace("‘", "'")
+
+    # 2. Fix missing commas between JSON fields (Crucial for MedGemma)
+    s = re.sub(r'(\d|true|false|"N/A")\s*\n?\s*"', r'\1, "', s)
+
+    # 3. Fix missing commas between objects
+    s = re.sub(r'\}\s*\n?\s*\{', r'}, {', s)
+
+    # 4. Remove trailing commas before closing braces
     s = re.sub(r",\s*([}\]])", r"\1", s)
+
+    # 5. Remove any invisible characters
+    s = s.strip().replace('\u200b', '')
     return s
 
 def _normalize_item(v: Any) -> Dict[str, Any]:
@@ -189,67 +213,25 @@ def _compute_total_and_severity(res: Dict[str, Any]) -> Tuple[int, str]:
     return total, sev
 
 # ----------------------------- Ollama clients -----------------------------
-def ollama_chat(host: str, model: str, system_prompt: str, user_prompt: str, timeout=180) -> str:
+def ollama_chat(host: str, model: str, system_prompt: str, user_prompt: str, timeout=600) -> str:
     url = f"http://{host}:11434/api/chat"
     payload = {
         "model": model,
-        "messages": (
-            [{"role": "system", "content": system_prompt}] if system_prompt else []
-        ) + [{"role": "user", "content": user_prompt}],
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
         "stream": False,
-        "options": {"temperature": 0.2, "top_k": 20, "top_p": 0.8}
+        "options": {
+            "temperature": 0.1,
+            "num_ctx": 8192,     # Essential for long transcripts
+            "num_predict": 2048   # Enough space for the full PHQ-8 JSON
+        }
     }
-    _log(f"[CHAT] host={host} model={model}")
-    _log("[CHAT] User prompt (exact):\n" + user_prompt)
     r = requests.post(url, json=payload, timeout=timeout)
     r.raise_for_status()
-    content = r.json()["message"]["content"]
-    _log("[CHAT] Raw model output (first 800 chars):\n" + content[:800])
-    return content
+    return r.json()["message"]["content"]
 
-# def ollama_embed(host: str, model: str, text: str, dim: Optional[int] = None, timeout=120) -> List[float]:
-#     import requests, math
-#
-#     url = f"http://{host}:11434/api/embeddings"
-#     headers = {"Content-Type": "application/json"}
-#
-#     def _post(payload):
-#         r = requests.post(url, json=payload, headers=headers, timeout=timeout)
-#         r.raise_for_status()
-#         return r.json()
-#
-#     # ---- 1️⃣  امتحان API جدید با "input"
-#     data = _post({"model": model, "input": text})
-#
-#     # ---- 2️⃣  اگر خالی یا بی‌پاسخ بود، امتحان با آرایه
-#     if not data.get("embedding") and not data.get("embeddings"):
-#         data = _post({"model": model, "input": [text]})
-#
-#     # ---- 3️⃣  اگر هنوز خالی بود، برگرد به روش قدیمی با "prompt"
-#     if not data.get("embedding") and not data.get("embeddings"):
-#         data = _post({"model": model, "prompt": text})
-#
-#     # ---- بررسی خطا و خروجی نهایی
-#     if "error" in data:
-#         raise RuntimeError(f"Ollama embeddings error: {data['error']} (model={model})")
-#
-#     if isinstance(data.get("embedding"), list):
-#         emb = data["embedding"]
-#     elif isinstance(data.get("embeddings"), list) and data["embeddings"]:
-#         emb = data["embeddings"][0]
-#     else:
-#         raise RuntimeError(f"Empty or invalid embedding response: {data}")
-#
-#     # ---- نرمال‌سازی و بُرش بعدی
-#     if dim is not None:
-#         emb = emb[:dim]
-#
-#     n = math.sqrt(sum(x * x for x in emb))
-#     if n > 0:
-#         emb = [x / n for x in emb]
-#
-#     _log(f"[EMB] host={host} model={model} dim={len(emb)} text_len={len(text)}")
-#     return emb
 
 def ollama_embed(host: str, model: str, text: str, dim: Optional[int] = None, timeout=120) -> List[float]:
     import requests, math
@@ -531,69 +513,70 @@ class QuantitativeAssessor:
         self.participant_embedded_transcripts = pet
 
     def extract_evidence(self, transcript: str) -> Dict[str, List[str]]:
-        _log("[STEP] Starting semantic LLM evidence extraction...")
+        _log_header("Step 1: Semantic Evidence Extraction")
 
-        # 1. Split transcript into sentences
         sentences = _sentences(transcript)
-
-        # 2. Group into chunks (5 sentences provide enough context)
         chunks = [" ".join(sentences[i: i + 5]) for i in range(0, len(sentences), 5)]
-
         all_extracted_evidence = {k: [] for k in PHQ8_KEYS}
-
-        # 3. New Prompt for semantic scanning
-        semantic_scan_prompt = """
-        Analyze the following transcript segment as a clinical expert.
-        Find any quotes or descriptions related to these PHQ-8 domains: {symptoms}.
-
-        Segment: "{segment}"
-
-        Return ONLY a JSON object. If no evidence is found, return an empty list [].
-        Format: {{"PHQ8_Depressed": ["quote1"], "PHQ8_Sleep": []}}
-        """
-
         symptoms_str = ", ".join(PHQ8_KEYS)
 
-        for i, segment in enumerate(chunks):
-            _log(f"Scanning segment {i + 1}/{len(chunks)}...")
+        # Template string without double curly braces to avoid .format() issues
+        # Updated base_prompt with standard clinical definitions
+        base_prompt = """
+                ACT AS A CLINICAL PSYCHOLOGIST. Extract EXACT quotes for these 8 symptoms based on DSM-5 standards:
 
-            user_prompt = semantic_scan_prompt.format(
-                symptoms=symptoms_str,
-                segment=segment
-            )
+                1. PHQ8_NoInterest: Loss of interest in USUAL activities (Hobbies/Social). 
+                2. PHQ8_Depressed: Persistent sadness or "feeling down".
+                3. PHQ8_Sleep: Insomnia (hard to sleep) or hypersomnia.
+                4. PHQ8_Tired: PHYSICAL exhaustion and lack of energy ONLY.
+                5. PHQ8_Appetite: Changes in eating habits or weight.
+                6. PHQ8_Failure: Guilt or feeling like a failure/burden. (e.g., 'not providing for family').
+                7. PHQ8_Concentrating: Cognitive struggle. (e.g., 'brain not switching off', 'can't focus').
+                8. PHQ8_Moving: Restlessness (fidgety) or physical slowness.
+
+                STRICT RULES:
+                - DO NOT extract 'not traveling' as NoInterest. 
+                - DO NOT put mood-related quotes into Tired or Appetite categories.
+
+                Segment: "SEGMENT_TEXT"
+                Return ONLY valid JSON. If no match, return {}.
+                """
+
+        for i, segment in enumerate(chunks):
+            # Safe string replacement instead of .format() to avoid KeyError
+            user_prompt = base_prompt.replace("SYMPTOMS_LIST", symptoms_str).replace("SEGMENT_TEXT", segment)
 
             try:
-                # Call Ollama for each chunk
                 raw_response = ollama_chat(
                     self.ollama_host,
                     self.chat_model,
-                    "You are a clinical evidence extractor. Output only JSON.",
+                    "You are a clinical evidence extractor. Be extremely category-specific.",
                     user_prompt
                 )
 
                 cleaned_json = _strip_json_block(raw_response)
                 segment_data = json.loads(cleaned_json)
-                print(f'found segments : {segment_data}')
 
-                # Safety check: convert empty list to dictionary to avoid attribute errors
-                if isinstance(segment_data, list):
-                    segment_data = {}
+                if isinstance(segment_data, list): segment_data = {}
 
-                # 4. Aggregate results
                 for key in PHQ8_KEYS:
                     quotes = segment_data.get(key, [])
-                    if isinstance(quotes, list):
+                    if isinstance(quotes, list) and quotes:
                         for q in quotes:
-                            q_clean = q.strip()
-                            if q_clean and q_clean not in all_extracted_evidence[key]:
-                                all_extracted_evidence[key].append(q_clean)
+                            if q.strip() and q not in all_extracted_evidence[key]:
+                                all_extracted_evidence[key].append(q.strip())
+                                _log(f"      [MATCH] Found for {key}: '{q[:30]}...'")
 
             except Exception as e:
-                _log(f"[WARN] Failed segment {i + 1}: {e}")
+                _log(f"      [WARN] Segment {i + 1} failed: {str(e)}")
                 continue
 
-        _log("[STEP] Semantic extraction complete.")
+        _log_header("Extraction Summary")
+        for k, v in all_extracted_evidence.items():
+            _log(f" - {k}: {len(v)} quotes")
+
         return all_extracted_evidence
+
 
     def build_reference_bundle(self, evidence_dict: Dict[str, List[str]]) -> Tuple[str, Dict[str, List[str]]]:
         blocks = []
@@ -616,32 +599,38 @@ class QuantitativeAssessor:
     def score_with_references(self, transcript: str, reference_bundle: str) -> Dict[str, Any]:
         user_prompt = make_scoring_user_prompt(transcript, reference_bundle)
         raw = ollama_chat(self.ollama_host, self.chat_model, SYSTEM_PROMPT, user_prompt)
-        # First attempt: normal strip + tolerant fixups
+
         try:
-            txt = _strip_json_block(raw)
-            fixed = _tolerant_fixups(txt)
-            obj = json.loads(fixed)
-            return _validate_and_normalize(obj)
-        except Exception as e1:
-            # Second attempt: extract exactly between <answer> ... </answer>
-            between = _extract_json_between_answer(raw)
-            if between is not None:
-                try:
-                    obj2 = json.loads(between)
-                    return _validate_and_normalize(obj2)
-                except Exception as e2:
-                    # Third attempt: ask the model to repair the JSON deterministically
-                    repaired = _llm_json_repair(self.ollama_host, self.chat_model, between)
-                    if repaired is not None:
-                        return _validate_and_normalize(repaired)
-                    # Final fallback: do NOT crash the server; return skeleton
-                    return _validate_and_normalize(_phq8_skeleton("Model JSON parse failed after salvage+repair"))
+            # Attempt 1: Standard JSON parse
+            txt = _extract_json_between_answer(raw)
+            if not txt:
+                start, end = raw.find('{'), raw.rfind('}') + 1
+                if start != -1 and end != -1: txt = raw[start:end]
+
+            if txt:
+                return _validate_and_normalize(json.loads(_tolerant_fixups(txt)))
+        except Exception:
+            _log("[WARN] JSON parse failed, switching to Regex recovery...")
+
+        # Attempt 2: Emergency Regex Recovery (The Bulletproof Way)
+        recovered_obj = {}
+        for key in PHQ8_KEYS:
+            # Look for "Key": { ... "score": X } or "score": "N/A"
+            pattern = rf'"{key}"\s*:\s*\{{[^}}]*?"score"\s*:\s*(\d|"N/A")'
+            match = re.search(pattern, raw, re.DOTALL)
+            if match:
+                score_val = match.group(1).replace('"', '')
+                recovered_obj[key] = {
+                    "evidence": "Extracted via recovery",
+                    "reason": "JSON was malformed, score recovered via regex",
+                    "score": int(score_val) if score_val.isdigit() else "N/A"
+                }
             else:
-                # No <answer> block found; try model-assisted repair on the raw best-effort strip
-                repaired = _llm_json_repair(self.ollama_host, self.chat_model, raw)
-                if repaired is not None:
-                    return _validate_and_normalize(repaired)
-                return _validate_and_normalize(_phq8_skeleton("Model did not return <answer> JSON"))
+                recovered_obj[key] = _empty_item("Recovery failed")
+
+        return _validate_and_normalize(recovered_obj)
+
+
 
     def assess(self, interview_text: str) -> Dict[str, Any]:
         _log("[STEP] Interview transcript:")

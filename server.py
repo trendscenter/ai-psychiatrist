@@ -43,7 +43,13 @@ def run_full_pipeline(request: InterviewRequest):
         quantitative_variant = "F"
 
     # 2) Quantitative PHQ scoring
-    quantitative_result = quantitative_assessor.assess(conversation)
+    # Just for debugging in server.py
+    try:
+        quantitative_result = quantitative_assessor.assess(conversation)
+    except Exception as e:
+        print(f"CRITICAL ERROR: {e}")
+        # Return more info to see the raw output
+        raise HTTPException(status_code=500, detail=str(e))
 
     # 3) Qualitative scoring
     qualitative_result = qualitative_assessor.assess(conversation)
@@ -58,12 +64,12 @@ def run_full_pipeline(request: InterviewRequest):
         qualitative=qualitative_result
     )
 
+    # Corrected dictionary keys in server.py return statement
     return {
         "mode": request.mode,
         "quantitative_variant": quantitative_variant,
         "conversation": conversation,
         "qualitative_result": qualitative_result,
-        "quantitative_evaluation": qualitative_evaluation,
-        "quantitative_score": quantitative_result,
+        "quantitative_score": quantitative_result,  # This holds your PHQ-8 scores
         "meta_review": final_review
     }
