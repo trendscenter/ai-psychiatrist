@@ -61,8 +61,23 @@ sbatch job_assess.sh
 
 ## References
 
-- [OpenReview paper](https://openreview.net/forum?id=mV0xJpO7A0)
-
 - [Ollama documentation](https://github.com/ollama/ollama)
 
 - [TReNDS cluster documentation](https://trendscenter.github.io/wiki)
+
+## Citation
+
+```
+@InProceedings{greene26,
+  title = {{AI} Psychiatrist Assistant: An {LLM}-based Multi-Agent System for Depression Assessment from Clinical Interviews},
+  author = {Greene, Adam and Blair, Neviah and Mahdipour Aghabagher, Samin and Kumari, Simmi and Schlund, Michael W. and Fedorov, Alex and Calhoun, Vince D. and Li, Xinhui and Silva, Rogers F.},
+  booktitle = {Proceedings of the Fifth Machine Learning for Health Symposium},
+  pages = {525--542},
+  year = {2026},
+  volume = {297},
+  series = {Proceedings of Machine Learning Research},
+  publisher = {PMLR},
+  pdf = {https://raw.githubusercontent.com/mlresearch/v297/main/assets/greene26a/greene26a.pdf},
+  url = {https://proceedings.mlr.press/v297/greene26a.html}
+}
+```
